@@ -1,0 +1,13 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3333:3333"
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+  mailhog:
+    image: mailhog/mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"

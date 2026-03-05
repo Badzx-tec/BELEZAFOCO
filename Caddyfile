@@ -1,0 +1,5 @@
+belezafoco.com {
+  encode gzip
+  reverse_proxy /api/* 127.0.0.1:3333
+  reverse_proxy 127.0.0.1:4173
+}
