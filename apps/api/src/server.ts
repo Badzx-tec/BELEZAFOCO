@@ -1,0 +1,7 @@
+import { buildApp } from "./app.js";
+import { env } from "./config/env.js";
+
+const app = buildApp();
+app.listen({ port: env.PORT, host: "0.0.0.0" }).then(() => {
+  app.log.info(`API rodando na porta ${env.PORT}`);
+});

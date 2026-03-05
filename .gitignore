@@ -1,0 +1,11 @@
+node_modules
+dist
+.env
+.env.local
+*.db
+*.db-*
+coverage
+pnpm-lock.yaml
+apps/api/prisma/dev.db
+apps/api/prisma/dev.db-*
+.DS_Store
