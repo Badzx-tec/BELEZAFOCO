@@ -166,7 +166,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     let payload: any;
 
     try {
-      payload = app.refreshJwt.verify(body.refreshToken);
+      payload = (app as any).refreshJwt.verify(body.refreshToken);
     } catch {
       throw app.httpErrors.unauthorized("Refresh token inválido");
     }
@@ -187,7 +187,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     let payload: any;
 
     try {
-      payload = app.refreshJwt.verify(body.refreshToken);
+      payload = (app as any).refreshJwt.verify(body.refreshToken);
     } catch {
       return { ok: true };
     }

@@ -39,9 +39,9 @@ API em `http://localhost:3333` e front em `http://localhost:5173`.
 ## Jobs
 
 ```bash
-node apps/api/dist/jobs/sendReminders.js
-node apps/api/dist/jobs/reconcilePayments.js
-node apps/api/dist/jobs/cleanup.js
+node apps/api/dist/src/jobs/sendReminders.js
+node apps/api/dist/src/jobs/reconcilePayments.js
+node apps/api/dist/src/jobs/cleanup.js
 ```
 
 ## Testes

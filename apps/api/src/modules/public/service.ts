@@ -172,16 +172,18 @@ async function getEligibleStaff(db: DbClient, workspaceId: string, serviceId: st
 }
 
 async function getSharedBlocks(db: DbClient, workspaceId: string, dayStart: Date, dayEnd: Date, staffMemberId: string, resourceId?: string | null) {
+  const scopeFilters: Prisma.CalendarBlockWhereInput[] = [
+    { scope: "workspace" as const },
+    { scope: "staff" as const, staffMemberId },
+    ...(resourceId ? [{ scope: "resource" as const, resourceId }] : [])
+  ];
+
   const blocks = await db.calendarBlock.findMany({
     where: {
       workspaceId,
       startAt: { lt: dayEnd },
       endAt: { gt: dayStart },
-      OR: [
-        { scope: "workspace" },
-        { scope: "staff", staffMemberId },
-        ...(resourceId ? [{ scope: "resource", resourceId }] : [])
-      ]
+      OR: scopeFilters
     },
     select: { startAt: true, endAt: true }
   });

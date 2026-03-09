@@ -44,7 +44,7 @@ Type=simple
 User=deploy
 WorkingDirectory=/home/deploy/BELEZAFOCO
 EnvironmentFile=/home/deploy/BELEZAFOCO/.env
-ExecStart=/usr/bin/node /home/deploy/BELEZAFOCO/apps/api/dist/server.js
+ExecStart=/usr/bin/node /home/deploy/BELEZAFOCO/apps/api/dist/src/server.js
 Restart=always
 
 [Install]
@@ -66,7 +66,7 @@ Exemplo `belezafoco-reminders.service`:
 Type=oneshot
 User=deploy
 WorkingDirectory=/home/deploy/BELEZAFOCO
-ExecStart=/usr/bin/node apps/api/dist/jobs/sendReminders.js
+ExecStart=/usr/bin/node apps/api/dist/src/jobs/sendReminders.js
 ```
 
 ## 6) Caddy + SSL

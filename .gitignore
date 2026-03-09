@@ -8,4 +8,7 @@ coverage
 pnpm-lock.yaml
 apps/api/prisma/dev.db
 apps/api/prisma/dev.db-*
+*.tsbuildinfo
+.run-*.log
+.local-*.log
 .DS_Store

@@ -1,8 +1,8 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
-import sensible from "@fastify/sensible";
 import rateLimit from "@fastify/rate-limit";
 import authPlugin from "./plugins/auth.js";
+import httpErrorsPlugin from "./plugins/http-errors.js";
 import tenantPlugin from "./plugins/tenant.js";
 import { authRoutes } from "./modules/auth/routes.js";
 import { workspaceRoutes } from "./modules/workspaces/routes.js";
@@ -27,7 +27,7 @@ export function buildApp() {
     }
   });
 
-  app.register(sensible);
+  app.register(httpErrorsPlugin);
   app.register(cors, { origin: env.CORS_ORIGIN === "*" ? true : env.CORS_ORIGIN.split(",") });
   app.register(rateLimit, { global: true, max: 100, timeWindow: "1 minute" });
   app.register(authPlugin);
@@ -43,7 +43,7 @@ export function buildApp() {
     }
 
     if ((error as any).statusCode) {
-      reply.code((error as any).statusCode).send({ message: error.message });
+      reply.code((error as any).statusCode).send({ message: error instanceof Error ? error.message : "Erro na requisição" });
       return;
     }
 

@@ -9,4 +9,4 @@ RUN pnpm install
 COPY . .
 RUN pnpm build
 EXPOSE 3333
-CMD ["node", "apps/api/dist/server.js"]
+CMD ["node", "apps/api/dist/src/server.js"]

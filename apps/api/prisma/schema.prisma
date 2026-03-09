@@ -185,6 +185,7 @@ model Service {
   requiredResource    Resource?      @relation("RequiredResource", fields: [requiredResourceId], references: [id])
   staffServices       StaffService[]
   appointments        Appointment[]
+  waitlistEntries     WaitlistEntry[]
 
   @@index([workspaceId, active, onlineBookingEnabled, displayOrder])
 }
