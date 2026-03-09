@@ -1,6 +1,7 @@
 # Deploy DigitalOcean (Ubuntu 24.04)
 
 ## 1) Hardening básico
+
 ```bash
 adduser deploy
 usermod -aG sudo deploy
@@ -8,15 +9,17 @@ ufw allow OpenSSH && ufw allow 80 && ufw allow 443 && ufw enable
 sudo apt update && sudo apt upgrade -y
 ```
 
-## 2) Node + pnpm
+## 2) Node + pnpm + PostgreSQL client
+
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs build-essential sqlite3
+sudo apt install -y nodejs build-essential postgresql-client
 corepack enable
 corepack prepare pnpm@9.12.1 --activate
 ```
 
-## 3) App
+## 3) Aplicação
+
 ```bash
 git clone <repo>
 cd BELEZAFOCO
@@ -28,7 +31,9 @@ pnpm build
 ```
 
 ## 4) systemd service
-`/etc/systemd/system/belezafoco.service`
+
+`/etc/systemd/system/belezafoco-api.service`
+
 ```ini
 [Unit]
 Description=BELEZAFOCO API
@@ -47,9 +52,15 @@ WantedBy=multi-user.target
 ```
 
 ## 5) Timers (jobs)
-Crie services/timers para reminders (5 min), reconcile (10 min), cleanup (daily).
+
+Crie services/timers para:
+
+- reminders a cada 5 minutos
+- reconcile a cada 10 minutos
+- cleanup diariamente
 
 Exemplo `belezafoco-reminders.service`:
+
 ```ini
 [Service]
 Type=oneshot
@@ -58,35 +69,31 @@ WorkingDirectory=/home/deploy/BELEZAFOCO
 ExecStart=/usr/bin/node apps/api/dist/jobs/sendReminders.js
 ```
 
-Exemplo `belezafoco-reminders.timer`:
-```ini
-[Timer]
-OnBootSec=2min
-OnUnitActiveSec=5min
-Unit=belezafoco-reminders.service
-```
-
 ## 6) Caddy + SSL
+
 ```bash
 sudo apt install -y caddy
 sudo cp Caddyfile /etc/caddy/Caddyfile
 sudo systemctl restart caddy
 ```
 
-## 7) Backup SQLite
+## 7) Backup PostgreSQL
+
 ```bash
-./scripts/backup_sqlite.sh apps/api/prisma/dev.db /home/deploy/backups
+./scripts/backup_postgres.sh "$DATABASE_URL" /home/deploy/backups
 ```
-Use cron diário e retenção 7 dias já inclusa no script.
 
 Restore:
+
 ```bash
-./scripts/restore_sqlite.sh /home/deploy/backups/belezafoco-AAAAMMDD-HHMMSS.db apps/api/prisma/dev.db
+./scripts/restore_postgres.sh /home/deploy/backups/belezafoco-AAAAMMDD-HHMMSS.dump "$DATABASE_URL"
 ```
 
 ## 8) Estratégia de update
+
 1. `git pull`
 2. `pnpm install --frozen-lockfile`
-3. `pnpm prisma:migrate`
-4. `pnpm build`
-5. `sudo systemctl restart belezafoco`
+3. `pnpm prisma:generate`
+4. `pnpm prisma:migrate`
+5. `pnpm build`
+6. `sudo systemctl restart belezafoco-api`

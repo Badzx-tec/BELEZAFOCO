@@ -15,17 +15,48 @@ import { waitlistRoutes } from "./modules/waitlist/routes.js";
 import { paymentRoutes } from "./modules/payments/routes.js";
 import { billingRoutes } from "./modules/billing/routes.js";
 import { clientRoutes } from "./modules/clients/routes.js";
+import { dashboardRoutes } from "./modules/dashboard/routes.js";
 import { env } from "./config/env.js";
+import { prisma } from "./lib/prisma.js";
+import { ZodError } from "zod";
 
 export function buildApp() {
-  const app = Fastify({ logger: { level: "info" } });
+  const app = Fastify({
+    logger: {
+      level: env.NODE_ENV === "production" ? "info" : "debug"
+    }
+  });
+
   app.register(sensible);
   app.register(cors, { origin: env.CORS_ORIGIN === "*" ? true : env.CORS_ORIGIN.split(",") });
   app.register(rateLimit, { global: true, max: 100, timeWindow: "1 minute" });
   app.register(authPlugin);
   app.register(tenantPlugin);
 
+  app.setErrorHandler((error, _req, reply) => {
+    if (error instanceof ZodError) {
+      reply.code(400).send({
+        message: "Dados inválidos",
+        issues: error.flatten()
+      });
+      return;
+    }
+
+    if ((error as any).statusCode) {
+      reply.code((error as any).statusCode).send({ message: error.message });
+      return;
+    }
+
+    app.log.error(error);
+    reply.code(500).send({ message: "Erro interno do servidor" });
+  });
+
   app.get("/health", async () => ({ status: "ok" }));
+  app.get("/ready", async () => {
+    await prisma.$queryRaw`SELECT 1`;
+    return { status: "ready" };
+  });
+
   app.register(authRoutes);
   app.register(workspaceRoutes);
   app.register(serviceRoutes);
@@ -37,6 +68,7 @@ export function buildApp() {
   app.register(paymentRoutes);
   app.register(billingRoutes);
   app.register(clientRoutes);
+  app.register(dashboardRoutes);
 
   return app;
 }

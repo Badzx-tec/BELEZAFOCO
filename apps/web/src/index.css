@@ -1,4 +1,63 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@400;600;700;800&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-body { @apply bg-slate-50 text-slate-900; }
+
+@layer base {
+  :root {
+    --bg-cream: #f6efe7;
+    --bg-warm: #f0dfd0;
+    --ink-900: #0f172a;
+    --accent: #c26b36;
+  }
+
+  html {
+    font-family: "Manrope", "Segoe UI", sans-serif;
+    background: var(--bg-cream);
+  }
+
+  body {
+    min-height: 100vh;
+    color: var(--ink-900);
+    background:
+      radial-gradient(circle at top left, rgba(194, 107, 54, 0.18), transparent 28%),
+      radial-gradient(circle at top right, rgba(15, 23, 42, 0.08), transparent 24%),
+      linear-gradient(180deg, #fbf7f1 0%, #f4ede5 52%, #efe4d8 100%);
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: "Sora", "Manrope", sans-serif;
+    letter-spacing: -0.03em;
+  }
+
+  ::selection {
+    background: rgba(194, 107, 54, 0.24);
+  }
+}
+
+@layer components {
+  .surface {
+    @apply rounded-[30px] border border-white/70 bg-white/80 shadow-[0_30px_90px_-40px_rgba(15,23,42,0.45)] backdrop-blur;
+  }
+
+  .surface-dark {
+    @apply rounded-[34px] border border-slate-900/5 bg-slate-950 shadow-[0_32px_90px_-40px_rgba(15,23,42,0.85)];
+  }
+
+  .mesh-panel {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+}

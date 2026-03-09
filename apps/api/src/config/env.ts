@@ -4,7 +4,7 @@ import { z } from "zod";
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().default(3333),
-  DATABASE_URL: z.string().default("file:./dev.db"),
+  DATABASE_URL: z.string().default("postgresql://postgres:postgres@localhost:5432/belezafoco?schema=public"),
   JWT_ACCESS_SECRET: z.string().min(10),
   JWT_REFRESH_SECRET: z.string().min(10),
   CORS_ORIGIN: z.string().default("*"),

@@ -1,13 +1,36 @@
 services:
-  app:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: belezafoco
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d belezafoco"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
     build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
     ports:
       - "3333:3333"
-    env_file: .env
-    volumes:
-      - ./data:/app/data
+    restart: unless-stopped
+
   mailhog:
     image: mailhog/mailhog
     ports:
       - "1025:1025"
       - "8025:8025"
+
+volumes:
+  postgres_data:

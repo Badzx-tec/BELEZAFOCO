@@ -1,9 +1,26 @@
 import { prisma } from "../lib/prisma.js";
 
-const pending = await prisma.payment.findMany({ where: { status: "pending" }, include: { appointment: true } });
-for (const p of pending) {
-  if (Date.now() - p.createdAt.getTime() > 30 * 60 * 1000) {
-    await prisma.payment.update({ where: { id: p.id }, data: { status: "failed" } });
-    await prisma.appointment.update({ where: { id: p.appointmentId }, data: { status: "cancelled", depositStatus: "failed" } });
-  }
+const pending = await prisma.payment.findMany({
+  where: { status: "pending" },
+  include: { appointment: true }
+});
+
+for (const payment of pending) {
+  if (!payment.expiresAt || payment.expiresAt.getTime() > Date.now()) continue;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.payment.update({
+      where: { id: payment.id },
+      data: { status: "failed" }
+    });
+
+    await tx.appointment.update({
+      where: { id: payment.appointmentId },
+      data: {
+        status: "cancelled",
+        depositStatus: "failed",
+        cancelledAt: new Date()
+      }
+    });
+  });
 }

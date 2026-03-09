@@ -3,7 +3,11 @@ import { enforcePlan } from "../src/lib/plan.js";
 
 describe("plan enforcement", () => {
   it("bloqueia basic acima do limite", () => {
-    expect(enforcePlan("basic", 4, 1, 100).allowed).toBe(false);
+    expect(enforcePlan("basic", 5, 1, 100).allowed).toBe(false);
+  });
+
+  it("bloqueia trial acima do limite mensal", () => {
+    expect(enforcePlan("trial", 2, 1, 61).allowed).toBe(false);
   });
 
   it("permite pro ilimitado", () => {
