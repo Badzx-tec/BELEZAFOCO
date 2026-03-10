@@ -147,6 +147,7 @@ export function buildApp() {
     });
 
     const spaEntry = async (_request: unknown, reply: any) => {
+      reply.header("Cache-Control", "no-store, must-revalidate");
       return reply.sendFile("index.html");
     };
 
