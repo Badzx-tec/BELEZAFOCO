@@ -38,10 +38,13 @@ COPY --from=build /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/apps ./apps
 COPY --from=build /app/packages ./packages
+COPY --from=build /app/docker ./docker
+
+RUN chmod +x /app/docker/start.sh
 
 EXPOSE 3333
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || 3333) + '/healthz').then((res) => { if (!res.ok) process.exit(1); }).catch(() => process.exit(1))"
 
-CMD ["node", "apps/api/dist/src/server.js"]
+CMD ["/app/docker/start.sh"]

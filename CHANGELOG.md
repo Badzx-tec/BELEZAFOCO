@@ -24,6 +24,7 @@
 - removed public booking demo fallbacks from frontend and backend so only real workspace slugs can book
 - updated seed/bootstrap defaults away from `demo-beleza` and marked owner seed users as verified
 - added API Vitest serialization and refreshed Playwright smoke coverage for landing, auth and public booking failure states
+- added `RUN_MIGRATIONS_ON_START` container support as a controlled bridge until the dedicated Northflank migration job is created
 
 ## 2026-03-09
 

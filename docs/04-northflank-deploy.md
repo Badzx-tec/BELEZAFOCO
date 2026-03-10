@@ -74,6 +74,7 @@ Notes:
 
 Optional:
 
+- `RUN_MIGRATIONS_ON_START=true` only as a temporary fallback when the manual migration job is not yet available
 - `GOOGLE_CLIENT_ID`
 - `SENTRY_DSN_API`
 - `SENTRY_ENVIRONMENT`
@@ -101,6 +102,12 @@ node_modules/.bin/prisma migrate deploy --schema prisma/schema.prisma
 
 Run it before promoting a release that contains schema changes.
 If the job reuses the service environment, keep `DATABASE_URL` stored with `schema=belezafoco`.
+
+## Temporary fallback for migrations
+
+- if the manual job is not available yet, set `RUN_MIGRATIONS_ON_START=true`
+- the checked-in container entrypoint will run `prisma migrate deploy` before starting the API
+- remove or disable this flag after the dedicated job exists and the schema is current
 
 ## Deploy flow
 
