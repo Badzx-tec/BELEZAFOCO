@@ -96,7 +96,7 @@ Optional:
 Create a manual Northflank job using the same repo/image or same build context:
 
 ```bash
-pnpm --filter @belezafoco/api exec prisma migrate deploy --schema apps/api/prisma/schema.prisma
+pnpm --filter @belezafoco/api exec prisma migrate deploy --schema prisma/schema.prisma
 ```
 
 Run it before promoting a release that contains schema changes.
@@ -105,7 +105,7 @@ If the job reuses the service environment, keep `DATABASE_URL` stored with `sche
 ## Temporary fallback for migrations
 
 - if the manual job is not available yet, set `RUN_MIGRATIONS_ON_START=true`
-- the checked-in container entrypoint will run `pnpm --filter @belezafoco/api exec prisma migrate deploy --schema apps/api/prisma/schema.prisma` before starting the API
+- the checked-in container entrypoint will run `pnpm --filter @belezafoco/api exec prisma migrate deploy --schema prisma/schema.prisma` before starting the API
 - keep the `prisma` CLI installed in the API runtime image while this fallback exists
 - remove or disable this flag after the dedicated job exists and the schema is current
 

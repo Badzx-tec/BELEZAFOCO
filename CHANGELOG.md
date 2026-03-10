@@ -25,7 +25,7 @@
 - updated seed/bootstrap defaults away from `demo-beleza` and marked owner seed users as verified
 - added API Vitest serialization and refreshed Playwright smoke coverage for landing, auth and public booking failure states
 - added `RUN_MIGRATIONS_ON_START` container support as a controlled bridge until the dedicated Northflank migration job is created
-- fixed the Northflank startup migration path by shipping the Prisma CLI in the API runtime image and invoking it through `pnpm --filter @belezafoco/api exec prisma`
+- fixed the Northflank startup migration path by shipping the Prisma CLI in the API runtime image and invoking it through `pnpm --filter @belezafoco/api exec prisma --schema prisma/schema.prisma`
 
 ## 2026-03-09
 
