@@ -3,6 +3,7 @@
 ## Environment
 
 - `DATABASE_URL` points to Northflank Postgres with SSL settings if required
+- shared-addon deployments use a dedicated schema suffix, currently `schema=belezafoco`
 - JWT secrets are unique per environment and at least 32 chars
 - public URL matches the final domain
 - optional Sentry, WhatsApp and Mercado Pago envs are injected through Northflank secrets
@@ -18,6 +19,7 @@
 ## Database
 
 - run `corepack pnpm prisma:migrate:deploy` in a manual/job release step
+- if the addon is reused and `public` is not empty, bootstrap the app schema once with the addon admin URI before the first migration
 - run seed only in demo or staging, never automatically in prod
 - verify `/readyz` after migrations
 - confirm backup policy for Postgres addon

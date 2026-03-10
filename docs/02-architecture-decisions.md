@@ -141,6 +141,20 @@ Reason:
 - local demo and operator testing still need a pragmatic fallback path
 - event id deduplication alone is not sufficient against forged or stale requests
 
+## ADR-011: isolate BELEZAFOCO in a dedicated PostgreSQL schema on Northflank
+
+Decision:
+
+- keep the Northflank Postgres addon, but run BELEZAFOCO in schema `belezafoco` instead of `public`
+- store `DATABASE_URL` with `schema=belezafoco` in the service environment
+- use the addon admin connection only for one-time schema bootstrap when the runtime role cannot create schemas
+
+Reason:
+
+- the existing addon database was not empty and already contained unrelated tables in `public`
+- Prisma `migrate deploy` correctly rejected the shared `public` schema with `P3005`
+- schema isolation avoids name collisions, keeps the addon reusable and preserves least-privilege runtime access after bootstrap
+
 ## Final stack
 
 - API: Fastify + Zod + Prisma + PostgreSQL

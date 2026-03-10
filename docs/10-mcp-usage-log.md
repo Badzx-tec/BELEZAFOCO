@@ -32,12 +32,14 @@ Decision influenced:
 - validated console cleanliness
 - validated mobile viewport behavior
 - validated the public booking demo flow end to end
+- operated the live Northflank UI to inspect service state, open pod shell, update environment variables and validate the production booking flow on the public domain
 
 Decision influenced:
 
 - fix demo booking crash
 - add local visual assets
 - add repository Playwright smoke coverage
+- isolate the app in PostgreSQL schema `belezafoco` after the addon `public` schema was found to be shared
 
 ### Sentry MCP
 
@@ -74,6 +76,7 @@ Decision influenced:
 Decision influenced:
 
 - combined-service Northflank path
+- dedicated-schema bootstrap path for shared Northflank Postgres addons
 - Pix/WhatsApp documentation scope
 - landing page positioning direction
 - Mercado Pago webhook signature and anti-replay design

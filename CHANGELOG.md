@@ -16,6 +16,7 @@
 - disabled `index.html` auto-registration in `@fastify/static` to avoid duplicate `HEAD /` conflicts during production boot
 - restricted tenant auth enforcement to `/me` and `/admin` so the Northflank combined service can serve the public SPA, booking flow and static assets without `401`
 - added server-side `demo-beleza` fallback data for public booking so the Northflank demo works even before the optional seed job runs
+- finalized the live Northflank rollout by isolating the app in PostgreSQL schema `belezafoco`, applying Prisma migrations in production and validating the public booking + Pix-style flow on the public domain
 - created production documentation set in `docs/01` through `docs/10`
 - created Linear project, PRD document and backlog issues for the productionization effort
 

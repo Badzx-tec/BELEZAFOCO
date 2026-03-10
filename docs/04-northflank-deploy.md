@@ -3,7 +3,7 @@
 ## Target shape
 
 - one combined service built from the root `Dockerfile`
-- one Postgres addon
+- one Postgres addon with a dedicated app schema
 - one manual migration job
 - one optional demo seed job
 
@@ -15,6 +15,13 @@
   - `/b/demo-beleza`
   - `/healthz`
   - `/readyz`
+  - `/public/b/demo-beleza`
+  - `/public/b/demo-beleza/slots?serviceId=service-cut&date=2026-03-11`
+- verified public booking flow:
+  - `POST /public/b/demo-beleza/book` returned `200` in production on March 10, 2026
+  - Pix-style reservation summary rendered in the public UI without console errors
+- first production bootstrap was executed from a live pod shell because the existing addon reused a non-empty `public` schema
+- create the manual migration job next before shipping further schema changes
 
 ## Service setup
 
@@ -38,6 +45,27 @@
 1. Create a PostgreSQL addon in the same project.
 2. Bind its connection string to `DATABASE_URL`.
 3. Keep the addon in the same environment as the service.
+4. If the addon database is shared or already has unrelated tables in `public`, append `schema=belezafoco` to `DATABASE_URL`.
+
+Example:
+
+```text
+postgresql://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require&schema=belezafoco
+```
+
+One-time bootstrap for shared addons:
+
+```bash
+cd apps/api
+echo 'CREATE SCHEMA IF NOT EXISTS belezafoco AUTHORIZATION "APP_USERNAME";' \
+  | DATABASE_URL="$POSTGRES_URI_ADMIN" node_modules/.bin/prisma db execute --stdin --schema prisma/schema.prisma
+DATABASE_URL="$DATABASE_URL" node_modules/.bin/prisma migrate deploy --schema prisma/schema.prisma
+```
+
+Notes:
+
+- `POSTGRES_URI_ADMIN` is available from the Northflank addon connection details and should be used only for bootstrap or controlled recovery
+- after the schema exists and is owned by the runtime user, the service can keep using the regular `DATABASE_URL`
 
 ## Required secrets
 
@@ -62,16 +90,19 @@ Optional:
 - `WHATSAPP_CLOUD_PHONE_ID`
 - `MP_ACCESS_TOKEN`
 - `MP_WEBHOOK_SECRET`
+- `POSTGRES_URI_ADMIN` only for first-time bootstrap or recovery on shared addons
 
 ## Migration job
 
 Create a manual Northflank job using the same repo/image or same build context:
 
 ```bash
-corepack pnpm prisma:migrate:deploy
+cd apps/api
+node_modules/.bin/prisma migrate deploy --schema prisma/schema.prisma
 ```
 
 Run it before promoting a release that contains schema changes.
+If the job reuses the service environment, keep `DATABASE_URL` stored with `schema=belezafoco`.
 
 ## Optional demo seed job
 
@@ -87,11 +118,13 @@ If the demo seed has not been executed yet, the public slug `demo-beleza` falls 
 
 1. Push code.
 2. Let Northflank build the image from `Dockerfile`.
-3. Run the migration job.
-4. Deploy the combined service.
-5. Verify `/healthz`.
-6. Verify `/readyz`.
-7. Open `/`, `/app` and `/b/demo-beleza`.
+3. Bootstrap `belezafoco` schema once if the addon `public` schema is already occupied.
+4. Run the migration job.
+5. Deploy or restart the combined service.
+6. Verify `/healthz`.
+7. Verify `/readyz`.
+8. Open `/`, `/app` and `/b/demo-beleza`.
+9. Call `/public/b/demo-beleza` and one `/slots` endpoint.
 
 ## Rollback
 
@@ -113,6 +146,10 @@ If the demo seed has not been executed yet, the public slug `demo-beleza` falls 
   ensure the image build runs `pnpm prisma:generate`
 - runtime cannot reach DB:
   verify addon binding and `DATABASE_URL`
+- `P3005` on first migration:
+  the current schema is not empty; move the app to a dedicated schema such as `belezafoco`
+- `permission denied for database` while using `schema=belezafoco`:
+  bootstrap the schema once with `POSTGRES_URI_ADMIN`, ownership set to the runtime user
 - startup before migrations:
   keep migrations in a separate manual job, not inside app startup
 
