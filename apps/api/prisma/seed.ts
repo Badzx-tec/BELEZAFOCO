@@ -12,18 +12,20 @@ function atHour(date: Date, hour: number, minute = 0) {
 async function main() {
   const email = process.env.SEED_ADMIN_EMAIL ?? "admin@belezafoco.local";
   const password = process.env.SEED_ADMIN_PASSWORD ?? "12345678";
+  const workspaceName = process.env.SEED_WORKSPACE_NAME ?? "Studio Inicial";
+  const workspaceSlug = process.env.SEED_WORKSPACE_SLUG ?? "studio-inicial";
   const hash = await argon2.hash(password);
 
   const user = await prisma.user.upsert({
     where: { email },
-    update: { passwordHash: hash, name: "Admin BELEZAFOCO" },
-    create: { email, passwordHash: hash, name: "Admin BELEZAFOCO" }
+    update: { passwordHash: hash, name: "Admin BELEZAFOCO", emailVerifiedAt: new Date() },
+    create: { email, passwordHash: hash, name: "Admin BELEZAFOCO", emailVerifiedAt: new Date() }
   });
 
   const workspace = await prisma.workspace.upsert({
-    where: { slug: "demo-beleza" },
+    where: { slug: workspaceSlug },
     update: {
-      name: "Studio Beleza Foco",
+      name: workspaceName,
       timezone: "America/Sao_Paulo",
       address: "Rua das Flores, 120 - Centro",
       whatsapp: "+5511999999999",
@@ -35,8 +37,8 @@ async function main() {
       onboardingCompletedAt: new Date()
     },
     create: {
-      name: "Studio Beleza Foco",
-      slug: "demo-beleza",
+      name: workspaceName,
+      slug: workspaceSlug,
       timezone: "America/Sao_Paulo",
       address: "Rua das Flores, 120 - Centro",
       whatsapp: "+5511999999999",

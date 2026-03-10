@@ -1,219 +1,374 @@
+import { useEffect, useState } from "react";
 import { AppShell } from "../components/AppShell";
-import { Badge, Button, Card, EmptyState, SectionTag } from "../components/ui";
-import { demoAgenda, demoChecklist, demoKpis, demoTopServices } from "../lib/demo";
+import { Badge, Button, Card, EmptyState, SectionTag, SkeletonBlock } from "../components/ui";
+import { formatCurrency, formatDateTime } from "../lib/format";
+import { useAuth } from "../lib/auth";
 
-const teamLoad = [
-  { name: "Joao", queue: "7 atendimentos", next: "Corte Premium as 15:15", tone: "accent" as const },
-  { name: "Camila", queue: "5 atendimentos", next: "Manicure em Gel as 16:30", tone: "warning" as const },
-  { name: "Bruna", queue: "6 atendimentos", next: "Limpeza Premium as 16:45", tone: "success" as const }
-];
-
-const actionFeed = [
-  { title: "Lembretes 2h antes enviados", detail: "12 clientes notificados sem duplicidade", tone: "success" as const },
-  { title: "2 reservas aguardando Pix", detail: "Servicos de maior disputa seguem protegidos", tone: "warning" as const },
-  { title: "Checklist de implantacao em 60%", detail: "Faltam permissões e templates automatizados", tone: "accent" as const }
-];
+type DashboardSummary = {
+  today: {
+    appointments: number;
+    confirmed: number;
+    pendingPayment: number;
+    occupancyRate: number;
+  };
+  funnel: {
+    cancelled: number;
+    noShows: number;
+    newClients: number;
+    recurringClients: number;
+  };
+  revenue: {
+    predicted: number;
+    confirmed: number;
+  };
+  upcoming: Array<{
+    id: string;
+    startAt: string;
+    status: string;
+    clientName: string;
+    serviceName: string;
+    staffName: string;
+  }>;
+  topServices: Array<{
+    serviceId: string;
+    name: string;
+    count: number;
+  }>;
+  topStaff: Array<{
+    staffMemberId: string;
+    name: string;
+    count: number;
+  }>;
+};
 
 function statusToneFor(status: string) {
   const normalized = status.toLowerCase();
-  if (normalized.includes("sinal")) return "accent" as const;
-  if (normalized.includes("pend")) return "warning" as const;
-  return "success" as const;
+  if (normalized.includes("pending")) return "warning" as const;
+  if (normalized.includes("cancel")) return "danger" as const;
+  if (normalized.includes("done")) return "success" as const;
+  return "accent" as const;
 }
 
-export function DashboardPage() {
+function LoadingDashboard() {
   return (
-    <AppShell
-      title="Studio Beleza Foco"
-      subtitle="Painel operacional para recepcao, agenda e cobranca do dia, com leitura rapida e cara de software pronto para vender."
-    >
+    <>
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {demoKpis.map((item, index) => (
-          <Card key={item.label} className="interactive-lift overflow-hidden px-5 py-5">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium text-slate-500">{item.label}</p>
-                <p className="mt-4 text-4xl font-semibold text-slate-950">{item.value}</p>
-              </div>
-              <span className={`rounded-2xl px-3 py-2 text-xs font-semibold ${index === 3 ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-700"}`}>
-                {index === 0 ? "Tempo real" : index === 1 ? "Meta semanal" : index === 2 ? "Saudavel" : "Controlado"}
-              </span>
-            </div>
-            <div className="mt-5 hairline h-px" />
-            <p className="mt-4 text-sm leading-6 text-slate-500">{item.note}</p>
+        {Array.from({ length: 4 }).map((_, index) => (
+          <Card key={index} className="px-5 py-5">
+            <SkeletonBlock className="h-4 w-28" />
+            <SkeletonBlock className="mt-5 h-12 w-24" />
+            <SkeletonBlock className="mt-5 h-px w-full rounded-none" />
+            <SkeletonBlock className="mt-4 h-4 w-40" />
           </Card>
         ))}
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <Card className="overflow-hidden px-6 py-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <SectionTag>Agenda do dia</SectionTag>
-              <h3 className="mt-4 text-balance text-[28px] font-semibold text-slate-950">
-                O que a recepcao precisa enxergar agora, sem rolagem cansativa.
-              </h3>
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-500">
-                Timeline clara, status forte e leitura instantanea para reagendamento, encaixe e cobranca.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Badge tone="success">7 confirmados</Badge>
-              <Badge tone="warning">3 pendentes</Badge>
-              <Badge tone="accent">2 com Pix</Badge>
-            </div>
-          </div>
-
-          <div className="mt-6 flex flex-wrap gap-2">
-            <Button variant="soft" size="sm">
-              Hoje
-            </Button>
-            <Button variant="ghost" size="sm">
-              Semana
-            </Button>
-            <Button variant="ghost" size="sm">
-              Filtrar por profissional
-            </Button>
-            <Button variant="ghost" size="sm">
-              Exportar resumo
-            </Button>
-          </div>
-
+        <Card className="px-6 py-6">
+          <SkeletonBlock className="h-6 w-44" />
+          <SkeletonBlock className="mt-4 h-10 w-2/3" />
+          <SkeletonBlock className="mt-3 h-4 w-5/6" />
           <div className="mt-6 space-y-3">
-            {demoAgenda.map((item) => (
-              <div
-                key={`${item.time}-${item.client}`}
-                className="grid gap-4 rounded-[28px] border border-slate-200/75 bg-white/86 px-4 py-4 transition hover:border-slate-300 md:grid-cols-[104px_1fr_auto] md:items-center"
-              >
-                <div className="rounded-[22px] bg-slate-950 px-4 py-3 text-white">
-                  <p className="text-xs uppercase tracking-[0.24em] text-white/60">Horario</p>
-                  <p className="mt-2 text-2xl font-semibold">{item.time}</p>
-                </div>
-
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-lg font-semibold text-slate-950">{item.client}</p>
-                    <Badge tone={statusToneFor(item.status)}>{item.status}</Badge>
-                  </div>
-                  <p className="mt-2 text-sm text-slate-500">
-                    {item.service} com {item.staff}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    <span>Confirmacao automatica</span>
-                    <span>WhatsApp</span>
-                    <span>Historico disponivel</span>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2 md:justify-end">
-                  <Button variant="secondary" size="sm">
-                    Reagendar
-                  </Button>
-                  <Button variant="soft" size="sm">
-                    Detalhes
-                  </Button>
-                </div>
-              </div>
+            {Array.from({ length: 4 }).map((_, index) => (
+              <SkeletonBlock key={index} className="h-28 w-full" />
             ))}
           </div>
         </Card>
 
         <div className="space-y-6">
           <Card className="px-6 py-6">
-            <SectionTag>Radar de operacao</SectionTag>
+            <SkeletonBlock className="h-5 w-36" />
             <div className="mt-5 space-y-3">
-              {actionFeed.map((item) => (
-                <div key={item.title} className="rounded-[24px] border border-slate-200/70 bg-white/80 px-4 py-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold text-slate-900">{item.title}</p>
-                    <Badge tone={item.tone}>{item.tone === "success" ? "ok" : item.tone === "warning" ? "atencao" : "insight"}</Badge>
-                  </div>
-                  <p className="mt-2 text-sm leading-6 text-slate-500">{item.detail}</p>
-                </div>
+              {Array.from({ length: 3 }).map((_, index) => (
+                <SkeletonBlock key={index} className="h-24 w-full" />
               ))}
             </div>
           </Card>
-
           <Card className="px-6 py-6">
-            <SectionTag>Equipe e fila</SectionTag>
+            <SkeletonBlock className="h-5 w-32" />
             <div className="mt-5 space-y-3">
-              {teamLoad.map((item) => (
-                <div key={item.name} className="rounded-[24px] bg-slate-50/90 px-4 py-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-base font-semibold text-slate-900">{item.name}</p>
-                    <Badge tone={item.tone}>{item.queue}</Badge>
-                  </div>
-                  <p className="mt-2 text-sm text-slate-500">{item.next}</p>
-                </div>
+              {Array.from({ length: 3 }).map((_, index) => (
+                <SkeletonBlock key={index} className="h-20 w-full" />
               ))}
             </div>
           </Card>
         </div>
       </section>
+    </>
+  );
+}
 
-      <section className="grid gap-6 xl:grid-cols-[0.9fr_0.7fr_0.7fr]">
-        <Card className="px-6 py-6">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <SectionTag>Onboarding guiado</SectionTag>
-              <h3 className="mt-4 text-2xl font-semibold text-slate-950">Checklist para implantar e cobrar rapido.</h3>
-            </div>
-            <Badge tone="accent">60%</Badge>
-          </div>
-          <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100">
-            <div className="h-full rounded-full bg-[var(--accent)]" style={{ width: "60%" }} />
-          </div>
-          <div className="mt-5 space-y-3">
-            {demoChecklist.map((item) => (
-              <div key={item.title} className="flex gap-4 rounded-[24px] border border-slate-200/70 bg-white/75 px-4 py-4">
-                <div className={`mt-1 h-3 w-3 rounded-full ${item.done ? "bg-emerald-500" : "bg-amber-400"}`} />
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">{item.title}</p>
-                  <p className="mt-1 text-sm leading-6 text-slate-500">{item.detail}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+export function DashboardPage() {
+  const { user, activeWorkspace, authorizedApi, logout } = useAuth();
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSummary() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const payload = await authorizedApi<DashboardSummary>("/me/dashboard/summary");
+        if (!cancelled) {
+          setSummary(payload);
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(loadError instanceof Error ? loadError.message : "Nao foi possivel carregar o painel");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadSummary();
+    return () => {
+      cancelled = true;
+    };
+  }, [authorizedApi, activeWorkspace?.id]);
+
+  return (
+    <AppShell
+      title={activeWorkspace ? `Painel de ${activeWorkspace.name}` : "Painel operacional"}
+      subtitle="Agenda, ocupacao, receita e clientes carregados do workspace autenticado em tempo real."
+      workspaceName={activeWorkspace?.name ?? "Workspace"}
+      workspaceSlug={activeWorkspace?.slug}
+      userName={user?.name}
+      onLogout={() => void logout()}
+    >
+      {loading ? <LoadingDashboard /> : null}
+
+      {!loading && error ? (
+        <Card className="px-6 py-8">
+          <EmptyState
+            title="Nao foi possivel carregar o painel"
+            description={error}
+            action={
+              <Button onClick={() => window.location.reload()}>
+                Tentar novamente
+              </Button>
+            }
+          />
         </Card>
+      ) : null}
 
-        <Card className="px-6 py-6">
-          <SectionTag>Servicos mais vendidos</SectionTag>
-          <div className="mt-5 space-y-5">
-            {demoTopServices.map((item) => (
-              <div key={item.name}>
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="font-semibold text-slate-900">{item.name}</span>
-                  <span className="text-slate-500">{item.share}% da agenda</span>
-                </div>
-                <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-100">
-                  <div className="h-full rounded-full bg-slate-950" style={{ width: `${item.share}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-6 rounded-[24px] bg-slate-50 px-4 py-4">
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Leitura comercial</p>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Use esses servicos para empurrar sinal Pix e recorrencia. Eles puxam a maior parte da receita prevista.
-            </p>
-          </div>
-        </Card>
-
-        <Card className="px-6 py-6">
-          <SectionTag>Lista de espera</SectionTag>
-          <div className="mt-5">
-            <EmptyState
-              title="Nenhuma espera ativa no momento"
-              description="Quando houver desmarcacao de ultima hora, este quadro pode priorizar clientes recorrentes e contatos quentes."
-              action={
-                <Button variant="secondary" size="sm">
-                  Configurar reengajamento
-                </Button>
+      {!loading && !error && summary ? (
+        <>
+          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {[
+              {
+                label: "Atendimentos hoje",
+                value: String(summary.today.appointments),
+                note: `${summary.today.confirmed} confirmados e ${summary.today.pendingPayment} aguardando sinal`
+              },
+              {
+                label: "Ocupacao",
+                value: `${summary.today.occupancyRate}%`,
+                note: "Leitura da agenda do dia considerando horas configuradas"
+              },
+              {
+                label: "Receita prevista",
+                value: formatCurrency(summary.revenue.predicted),
+                note: "Soma dos servicos agendados no periodo atual"
+              },
+              {
+                label: "Receita confirmada",
+                value: formatCurrency(summary.revenue.confirmed),
+                note: `${summary.funnel.newClients} novos clientes e ${summary.funnel.recurringClients} recorrentes neste mes`
               }
-            />
-          </div>
-        </Card>
-      </section>
+            ].map((item, index) => (
+              <Card key={item.label} className="interactive-lift overflow-hidden px-5 py-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-slate-500">{item.label}</p>
+                    <p className="mt-4 text-4xl font-semibold text-slate-950">{item.value}</p>
+                  </div>
+                  <span className={`rounded-2xl px-3 py-2 text-xs font-semibold ${index >= 2 ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-700"}`}>
+                    {index === 0 ? "Operacao" : index === 1 ? "Capacidade" : index === 2 ? "Previsto" : "Confirmado"}
+                  </span>
+                </div>
+                <div className="mt-5 hairline h-px" />
+                <p className="mt-4 text-sm leading-6 text-slate-500">{item.note}</p>
+              </Card>
+            ))}
+          </section>
+
+          <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+            <Card className="overflow-hidden px-6 py-6">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <SectionTag>Agenda do dia</SectionTag>
+                  <h3 className="mt-4 text-balance text-[28px] font-semibold text-slate-950">
+                    O que a operacao precisa enxergar agora.
+                  </h3>
+                  <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-500">
+                    Lista real dos proximos atendimentos com status, cliente e profissional a partir do workspace autenticado.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge tone="success">{summary.today.confirmed} confirmados</Badge>
+                  <Badge tone="warning">{summary.today.pendingPayment} aguardando sinal</Badge>
+                  <Badge tone="danger">{summary.funnel.cancelled} cancelamentos</Badge>
+                </div>
+              </div>
+
+              <div className="mt-6 space-y-3">
+                {summary.upcoming.length ? (
+                  summary.upcoming.map((item) => (
+                    <div
+                      key={item.id}
+                      className="grid gap-4 rounded-[28px] border border-slate-200/75 bg-white/86 px-4 py-4 transition hover:border-slate-300 md:grid-cols-[140px_1fr_auto] md:items-center"
+                    >
+                      <div className="rounded-[22px] bg-slate-950 px-4 py-3 text-white">
+                        <p className="text-xs uppercase tracking-[0.24em] text-white/60">Horario</p>
+                        <p className="mt-2 text-sm font-semibold leading-6">{formatDateTime(item.startAt)}</p>
+                      </div>
+
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-lg font-semibold text-slate-950">{item.clientName}</p>
+                          <Badge tone={statusToneFor(item.status)}>{item.status}</Badge>
+                        </div>
+                        <p className="mt-2 text-sm text-slate-500">
+                          {item.serviceName} com {item.staffName}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 md:justify-end">
+                        <Button variant="secondary" size="sm">
+                          Reagendar
+                        </Button>
+                        <Button variant="soft" size="sm">
+                          Detalhes
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <EmptyState
+                    title="Nenhum atendimento futuro encontrado"
+                    description="Assim que houver reservas confirmadas neste workspace, a agenda operacional aparece aqui."
+                  />
+                )}
+              </div>
+            </Card>
+
+            <div className="space-y-6">
+              <Card className="px-6 py-6">
+                <SectionTag>Radar comercial</SectionTag>
+                <div className="mt-5 space-y-3">
+                  {[
+                    {
+                      title: "Novos clientes no mes",
+                      detail: `${summary.funnel.newClients} cadastros recentes com potencial de recorrencia`,
+                      tone: "success" as const
+                    },
+                    {
+                      title: "Clientes recorrentes",
+                      detail: `${summary.funnel.recurringClients} clientes com duas ou mais visitas registradas`,
+                      tone: "accent" as const
+                    },
+                    {
+                      title: "No-shows e cancelamentos",
+                      detail: `${summary.funnel.noShows} faltas e ${summary.funnel.cancelled} cancelamentos no periodo`,
+                      tone: "warning" as const
+                    }
+                  ].map((item) => (
+                    <div key={item.title} className="rounded-[24px] border border-slate-200/70 bg-white/80 px-4 py-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-semibold text-slate-900">{item.title}</p>
+                        <Badge tone={item.tone}>{item.tone === "success" ? "ok" : item.tone === "warning" ? "alerta" : "insight"}</Badge>
+                      </div>
+                      <p className="mt-2 text-sm leading-6 text-slate-500">{item.detail}</p>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
+              <Card className="px-6 py-6">
+                <SectionTag>Equipe mais ativa</SectionTag>
+                <div className="mt-5 space-y-3">
+                  {summary.topStaff.length ? (
+                    summary.topStaff.map((item) => (
+                      <div key={item.staffMemberId} className="rounded-[24px] bg-slate-50/90 px-4 py-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-base font-semibold text-slate-900">{item.name}</p>
+                          <Badge tone="accent">{item.count} atendimentos</Badge>
+                        </div>
+                        <p className="mt-2 text-sm text-slate-500">Volume consolidado no periodo atual.</p>
+                      </div>
+                    ))
+                  ) : (
+                    <EmptyState
+                      title="Sem equipe ranqueada ainda"
+                      description="Quando os atendimentos entrarem, o ranking operacional aparece aqui."
+                    />
+                  )}
+                </div>
+              </Card>
+            </div>
+          </section>
+
+          <section className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
+            <Card className="px-6 py-6">
+              <SectionTag>Servicos com mais saida</SectionTag>
+              <div className="mt-5 space-y-5">
+                {summary.topServices.length ? (
+                  summary.topServices.map((item, index) => (
+                    <div key={item.serviceId}>
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span className="font-semibold text-slate-900">{item.name}</span>
+                        <span className="text-slate-500">{item.count} reservas</span>
+                      </div>
+                      <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className="h-full rounded-full bg-slate-950"
+                          style={{ width: `${Math.max(20, 100 - index * 18)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <EmptyState
+                    title="Sem servicos ranqueados ainda"
+                    description="O ranking aparece assim que o workspace receber agendamentos reais."
+                  />
+                )}
+              </div>
+            </Card>
+
+            <Card className="px-6 py-6">
+              <SectionTag>Leitura do workspace</SectionTag>
+              <div className="mt-5 grid gap-4 sm:grid-cols-3">
+                <div className="rounded-[24px] bg-white/80 px-4 py-4 soft-ring">
+                  <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Slug</p>
+                  <p className="mt-3 text-lg font-semibold text-slate-950">{activeWorkspace?.slug ?? "-"}</p>
+                </div>
+                <div className="rounded-[24px] bg-white/80 px-4 py-4 soft-ring">
+                  <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Perfil</p>
+                  <p className="mt-3 text-lg font-semibold text-slate-950">{activeWorkspace?.role ?? "-"}</p>
+                </div>
+                <div className="rounded-[24px] bg-white/80 px-4 py-4 soft-ring">
+                  <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Timezone</p>
+                  <p className="mt-3 text-lg font-semibold text-slate-950">{activeWorkspace?.timezone ?? "-"}</p>
+                </div>
+              </div>
+
+              <div className="mt-6 rounded-[28px] border border-slate-200/75 bg-white/70 px-5 py-5">
+                <p className="text-sm leading-7 text-slate-500">
+                  Este painel agora depende de autenticacao real e do workspace selecionado. Nada aqui usa fallback visual para sessao ou usuario.
+                </p>
+              </div>
+            </Card>
+          </section>
+        </>
+      ) : null}
     </AppShell>
   );
 }

@@ -16,7 +16,7 @@ Agenda online profissional + confirmacao + lembretes + sinal no Pix + gestao por
 
 - WhatsApp is central, not secondary
 - Pix deposit is native to Brazilian buying behavior
-- visual quality is strong enough for owner demos and portfolio use
+- visual quality is strong enough for live commercial presentation and portfolio use
 - setup path is short enough for local service selling
 
 ## Commercial talk track
@@ -42,16 +42,17 @@ Agenda online profissional + confirmacao + lembretes + sinal no Pix + gestao por
 - mostrar o dashboard com leitura operacional em segundos
 - fechar com trial curto e implantacao assistida
 
-## Demo strategy
+## Sales flow
 
 1. Abrir landing.
 2. Mostrar nichos e proposta de valor.
-3. Abrir `/b/demo-beleza` no celular.
-4. Simular reserva com Pix.
-5. Abrir `/app` e mostrar radar operacional.
+3. Abrir `/auth` e mostrar cadastro real do negocio.
+4. Entrar no painel e mostrar onboarding, agenda e dashboard.
+5. Abrir o link publico real do workspace no celular.
+6. Simular reserva com Pix.
 
 ## Portfolio strategy
 
-- usar a landing e o booking demo como material visual
+- usar a landing, o fluxo real de cadastro e o booking publico real como material visual
 - gravar uma walkthrough curta em celular + desktop
 - destacar local assets, same-origin deploy path and operational dashboard

@@ -16,6 +16,8 @@ const envSchema = z.object({
   SMTP_PORT: z.coerce.number().optional(),
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
+  GOOGLE_CLIENT_ID: z.string().optional(),
   MERCADO_PAGO_ENABLED: z.coerce.boolean().default(false),
   MP_ACCESS_TOKEN: z.string().optional(),
   MP_WEBHOOK_SECRET: z.string().optional(),

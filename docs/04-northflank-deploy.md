@@ -5,21 +5,15 @@
 - one combined service built from the root `Dockerfile`
 - one Postgres addon with a dedicated app schema
 - one manual migration job
-- one optional demo seed job
 
 ## Verified deployment
 
 - public URL validated on March 10, 2026: `https://p03--belezafoco-api--fdzfclqyqq99.code.run`
 - verified endpoints:
   - `/`
-  - `/b/demo-beleza`
+  - `/auth`
   - `/healthz`
   - `/readyz`
-  - `/public/b/demo-beleza`
-  - `/public/b/demo-beleza/slots?serviceId=service-cut&date=2026-03-11`
-- verified public booking flow:
-  - `POST /public/b/demo-beleza/book` returned `200` in production on March 10, 2026
-  - Pix-style reservation summary rendered in the public UI without console errors
 - first production bootstrap was executed from a live pod shell because the existing addon reused a non-empty `public` schema
 - create the manual migration job next before shipping further schema changes
 
@@ -74,9 +68,13 @@ Notes:
 - `JWT_REFRESH_SECRET`
 - `CORS_ORIGIN`
 - `PUBLIC_URL`
+- `SMTP_USER`
+- `SMTP_PASSWORD`
+- `SMTP_FROM`
 
 Optional:
 
+- `GOOGLE_CLIENT_ID`
 - `SENTRY_DSN_API`
 - `SENTRY_ENVIRONMENT`
 - `SENTRY_RELEASE`
@@ -104,27 +102,19 @@ node_modules/.bin/prisma migrate deploy --schema prisma/schema.prisma
 Run it before promoting a release that contains schema changes.
 If the job reuses the service environment, keep `DATABASE_URL` stored with `schema=belezafoco`.
 
-## Optional demo seed job
-
-```bash
-corepack pnpm seed
-```
-
-Use only for demo or staging environments.
-
-If the demo seed has not been executed yet, the public slug `demo-beleza` falls back to a server-side demo payload so the commercial flow still loads cleanly in Northflank.
-
 ## Deploy flow
 
 1. Push code.
 2. Let Northflank build the image from `Dockerfile`.
 3. Bootstrap `belezafoco` schema once if the addon `public` schema is already occupied.
 4. Run the migration job.
-5. Deploy or restart the combined service.
-6. Verify `/healthz`.
-7. Verify `/readyz`.
-8. Open `/`, `/app` and `/b/demo-beleza`.
-9. Call `/public/b/demo-beleza` and one `/slots` endpoint.
+5. Configure auth envs for registration and Google Sign-In.
+6. Deploy or restart the combined service.
+7. Verify `/healthz`.
+8. Verify `/readyz`.
+9. Open `/` and `/auth`.
+10. Register a real owner account or sign in with Google if configured.
+11. Validate one real public booking slug created by onboarding.
 
 ## Rollback
 

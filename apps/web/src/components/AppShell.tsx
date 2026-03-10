@@ -4,6 +4,10 @@ import { Badge, Button } from "./ui";
 type AppShellProps = PropsWithChildren<{
   title: string;
   subtitle: string;
+  workspaceName: string;
+  workspaceSlug?: string;
+  userName?: string;
+  onLogout?: () => void;
 }>;
 
 const sidebarItems = [
@@ -15,14 +19,23 @@ const sidebarItems = [
   { label: "Cobranca", hint: "Pix", active: false }
 ];
 
-function SidebarContent({ onClose }: { onClose?: () => void }) {
+function SidebarContent({
+  workspaceName,
+  workspaceSlug,
+  onClose
+}: {
+  workspaceName: string;
+  workspaceSlug?: string;
+  onClose?: () => void;
+}) {
   return (
     <>
       <div className="border-b border-white/10 px-6 py-6">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-300/80">BELEZAFOCO</p>
-            <h1 className="mt-3 text-[28px] font-semibold text-white">Studio Beleza Foco</h1>
+            <h1 className="mt-3 text-[28px] font-semibold text-white">{workspaceName}</h1>
+            {workspaceSlug ? <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-500">{workspaceSlug}</p> : null}
           </div>
           {onClose ? (
             <Button variant="ghost" size="sm" className="text-slate-300 hover:bg-white/10 hover:text-white lg:hidden" onClick={onClose}>
@@ -67,11 +80,11 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
               <p className="mt-2 text-lg font-semibold text-white">14 dias para implantar e vender</p>
             </div>
             <Badge tone="accent" className="bg-amber-400/10 text-amber-200 ring-amber-300/20">
-              Em teste
+              Producao
             </Badge>
           </div>
           <p className="mt-3 text-sm leading-6 text-slate-300">
-            Link publico, lembretes e sinal Pix prontos para uma demo comercial consistente.
+            Link publico, lembretes e sinal Pix prontos para operacao comercial real.
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <div className="rounded-2xl bg-white/6 px-3 py-3">
@@ -89,7 +102,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   );
 }
 
-export function AppShell({ title, subtitle, children }: AppShellProps) {
+export function AppShell({ title, subtitle, workspaceName, workspaceSlug, userName, onLogout, children }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -100,7 +113,7 @@ export function AppShell({ title, subtitle, children }: AppShellProps) {
         <div className="fixed inset-0 z-40 bg-slate-950/45 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)}>
           <aside className="surface-dark absolute left-4 top-4 bottom-4 w-[min(88vw,360px)] overflow-hidden" onClick={(event) => event.stopPropagation()}>
             <div className="flex h-full flex-col">
-              <SidebarContent onClose={() => setMobileOpen(false)} />
+              <SidebarContent workspaceName={workspaceName} workspaceSlug={workspaceSlug} onClose={() => setMobileOpen(false)} />
             </div>
           </aside>
         </div>
@@ -108,7 +121,7 @@ export function AppShell({ title, subtitle, children }: AppShellProps) {
 
       <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[290px_minmax(0,1fr)]">
         <aside className="surface-dark sticky top-6 hidden h-[calc(100vh-3rem)] overflow-hidden lg:flex lg:flex-col">
-          <SidebarContent />
+          <SidebarContent workspaceName={workspaceName} workspaceSlug={workspaceSlug} />
         </aside>
 
         <main className="space-y-6">
@@ -128,8 +141,14 @@ export function AppShell({ title, subtitle, children }: AppShellProps) {
                   <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-500">{subtitle}</p>
                 </div>
                 <div className="hidden items-center gap-2 sm:flex">
+                  {userName ? <Badge>{userName}</Badge> : null}
                   <Button variant="soft">Bloquear horario</Button>
                   <Button>Novo agendamento</Button>
+                  {onLogout ? (
+                    <Button variant="secondary" onClick={onLogout}>
+                      Sair
+                    </Button>
+                  ) : null}
                 </div>
               </div>
               <div className="hairline h-px" />

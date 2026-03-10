@@ -56,7 +56,7 @@
 
 - Pix provider already supports real `POST /v1/payments` creation with `X-Idempotency-Key` when `MP_ACCESS_TOKEN` is configured
 - webhook processing can resolve official notifications by querying `GET /v1/payments/{id}` before mutating local payment state
-- local demo/manual fallback remains available for controlled testing without provider callbacks
+- webhook shared-secret fallback remains available only for controlled operator testing, never as a public booking shortcut
 
 ## Webhooks
 

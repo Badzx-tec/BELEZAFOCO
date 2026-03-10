@@ -57,20 +57,18 @@ Reason:
 - Prisma/OpenSSL/container compatibility is materially safer on Debian slim
 - this reduces risk in build, runtime and migration jobs
 
-## ADR-005: optional demo fallback for public booking
+## ADR-005: public booking must stay strictly production-bound
 
 Decision:
 
-- keep a no-backend demo experience for `/b/demo-beleza`
+- remove fallback payloads and synthetic booking paths from the public booking flow
+- require every public booking route to resolve a real workspace slug in PostgreSQL
 
 Reason:
 
-- sales demos and visual QA should not depend on a local database
-- this improves portfolio quality and supports commercial demonstrations
-
-Constraint:
-
-- demo fallback is a presentation path, not the transactional production path
+- the user explicitly rejected demo-only flows
+- payment, booking conflicts and audit trails only make sense against real tenant data
+- production trust is higher when the public link always reflects a live workspace
 
 ## ADR-006: observability must be env-driven and optional
 
@@ -85,7 +83,7 @@ Implementation:
 
 Reason:
 
-- the repo must build cleanly in local/dev/demo contexts
+- the repo must build cleanly in local, staging and production contexts
 - production can turn on monitoring without code changes
 
 ## ADR-007: release-safe Prisma flow
@@ -94,7 +92,7 @@ Decision:
 
 - build runs `prisma generate`
 - production database changes should use `prisma migrate deploy`
-- seed remains an optional manual/demo job
+- seed remains an optional manual bootstrap job only
 
 Reason:
 
@@ -138,8 +136,22 @@ Decision:
 Reason:
 
 - production payment callbacks need stronger authenticity checks than a plain string comparison
-- local demo and operator testing still need a pragmatic fallback path
+- controlled operator testing still needs a pragmatic fallback path
 - event id deduplication alone is not sufficient against forged or stale requests
+
+## ADR-012: authentication is first-class production infrastructure
+
+Decision:
+
+- password registration requires email verification before panel access
+- password recovery uses one-time hashed tokens with expiry and revocation
+- Google Sign-In is supported with backend token verification when `GOOGLE_CLIENT_ID` is configured
+
+Reason:
+
+- owner onboarding has to be real, not a seeded shortcut
+- email verification reduces bad data and protects billing, reminders and workspace ownership
+- Google Sign-In reduces friction for first access while preserving backend trust boundaries
 
 ## ADR-011: isolate BELEZAFOCO in a dedicated PostgreSQL schema on Northflank
 

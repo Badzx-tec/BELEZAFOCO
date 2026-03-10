@@ -3,9 +3,14 @@ import ReactDOM from "react-dom/client";
 import * as Sentry from "@sentry/react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import "./index.css";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+import { AuthProvider } from "./lib/auth";
+import { AuthPage } from "./pages/AuthPage";
 import { LandingPage } from "./pages/LandingPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { PublicBookingPage } from "./pages/PublicBookingPage";
+import { ResetPasswordPage } from "./pages/ResetPasswordPage";
+import { VerifyEmailPage } from "./pages/VerifyEmailPage";
 
 if (import.meta.env.VITE_SENTRY_DSN) {
   Sentry.init({
@@ -20,12 +25,24 @@ if (import.meta.env.VITE_SENTRY_DSN) {
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/app" element={<DashboardPage />} />
-        <Route path="/b/:slug" element={<PublicBookingPage />} />
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/auth" element={<AuthPage />} />
+          <Route path="/auth/verify-email" element={<VerifyEmailPage />} />
+          <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+          <Route
+            path="/app"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/b/:slug" element={<PublicBookingPage />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   </React.StrictMode>
 );

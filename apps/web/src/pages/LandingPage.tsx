@@ -108,11 +108,11 @@ export function LandingPage() {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <Link to="/app">
+                <Link to="/auth">
                   <Button variant="secondary">Entrar no painel</Button>
                 </Link>
-                <Link to="/b/demo-beleza">
-                  <Button>Testar agendamento</Button>
+                <Link to="/auth">
+                  <Button>Criar conta</Button>
                 </Link>
               </div>
             </div>
@@ -131,14 +131,14 @@ export function LandingPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-3">
-                  <Link to="/b/demo-beleza">
-                    <Button size="lg">Abrir demo publica</Button>
+                  <Link to="/auth">
+                    <Button size="lg">Criar conta agora</Button>
                   </Link>
-                  <Link to="/app">
+                  <a href="#planos">
                     <Button variant="secondary" size="lg">
-                      Ver dashboard
+                      Ver planos
                     </Button>
-                  </Link>
+                  </a>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -153,7 +153,7 @@ export function LandingPage() {
               <div className="surface-dark mesh-panel relative overflow-hidden px-5 py-5 text-white">
                 <div className="absolute right-5 top-5">
                   <Badge tone="accent" className="bg-amber-400/12 text-amber-200 ring-amber-300/20">
-                    Pronto para demo
+                    Pronto para vender
                   </Badge>
                 </div>
 
@@ -196,7 +196,7 @@ export function LandingPage() {
                     </div>
                     <div className="mt-4 rounded-[24px] bg-black/20 px-4 py-4">
                       <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Link publico</p>
-                      <p className="mt-2 text-sm font-semibold text-white">belezafoco.com/b/demo-beleza</p>
+                      <p className="mt-2 text-sm font-semibold text-white">belezafoco.com/b/seu-negocio</p>
                       <p className="mt-2 text-sm leading-6 text-slate-300">UX mobile-first com identidade da marca e politica do negocio.</p>
                     </div>
                   </div>
@@ -327,8 +327,8 @@ export function LandingPage() {
               <SectionTag>FAQ</SectionTag>
               <h2 className="mt-4 text-3xl font-semibold text-slate-950">Perguntas que surgem na venda.</h2>
             </div>
-            <Link to="/b/demo-beleza">
-              <Button variant="secondary">Abrir demo publica</Button>
+            <Link to="/auth">
+              <Button variant="secondary">Criar conta</Button>
             </Link>
           </div>
           <div className="mt-6 grid gap-4 lg:grid-cols-3">
@@ -349,18 +349,18 @@ export function LandingPage() {
                 Se a agenda e o WhatsApp ainda vivem separados, o negocio esta perdendo dinheiro.
               </h2>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-                Use a demo publica para sentir o fluxo do cliente e o painel para vender o ganho operacional para o dono.
+                Crie sua conta, publique seu link de agendamento e coloque a operacao inteira para rodar em fluxo real.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Link to="/b/demo-beleza">
-                <Button size="lg">Testar fluxo publico</Button>
+              <Link to="/auth">
+                <Button size="lg">Comecar agora</Button>
               </Link>
-              <Link to="/app">
+              <a href="#planos">
                 <Button variant="secondary" size="lg">
-                  Ver o SaaS por dentro
+                  Ver planos
                 </Button>
-              </Link>
+              </a>
             </div>
           </div>
         </Card>

@@ -1,9 +1,19 @@
 import { FastifyPluginAsync } from "fastify";
-import { prisma } from "../../lib/prisma.js";
 import { z } from "zod";
-import argon2 from "argon2";
-import { addDays } from "date-fns";
-import { randomUUID } from "node:crypto";
+import { prisma } from "../../lib/prisma.js";
+import {
+  authenticateWithGoogle,
+  findRefreshTokenRecord,
+  getMe,
+  getPublicAuthConfig,
+  issueSession,
+  loginWithPassword,
+  registerWithPassword,
+  requestPasswordReset,
+  resendVerificationEmail,
+  resetPassword,
+  verifyEmailToken
+} from "./service.js";
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -24,155 +34,85 @@ const refreshSchema = z.object({
   refreshToken: z.string().min(10)
 });
 
-function normalizeSlug(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
+const emailSchema = z.object({
+  email: z.string().email()
+});
 
-async function issueSession(app: any, userId: string) {
-  const accessToken = app.accessJwt.sign({ sub: userId });
-  const refreshToken = app.refreshJwt.sign({ sub: userId, jti: randomUUID() });
-  const tokenHash = await argon2.hash(refreshToken);
+const tokenSchema = z.object({
+  token: z.string().min(20)
+});
 
-  await prisma.refreshToken.create({
-    data: {
-      userId,
-      tokenHash,
-      expiresAt: addDays(new Date(), 30)
-    }
-  });
+const resetPasswordSchema = tokenSchema.extend({
+  password: z.string().min(8)
+});
 
-  return { accessToken, refreshToken };
-}
-
-async function findRefreshTokenRecord(userId: string, refreshToken: string) {
-  const tokens = await prisma.refreshToken.findMany({
-    where: {
-      userId,
-      revokedAt: null,
-      expiresAt: { gt: new Date() }
-    },
-    orderBy: { createdAt: "desc" }
-  });
-
-  for (const token of tokens) {
-    if (await argon2.verify(token.tokenHash, refreshToken)) return token;
-  }
-
-  return null;
-}
+const googleSchema = z.object({
+  credential: z.string().min(20),
+  workspaceName: z.string().min(2).optional(),
+  slug: z.string().min(3).optional(),
+  whatsapp: z.string().optional(),
+  timezone: z.string().default("America/Sao_Paulo")
+});
 
 export const authRoutes: FastifyPluginAsync = async (app) => {
+  app.get("/auth/config", async () => getPublicAuthConfig());
+
   app.post("/auth/register", async (req, reply) => {
     const body = registerSchema.parse(req.body);
-    const slug = normalizeSlug(body.slug);
-    const passwordHash = await argon2.hash(body.password);
-    const trialEndsAt = addDays(new Date(), 14);
-
-    const created = await prisma.user.create({
-      data: {
-        email: body.email.toLowerCase(),
-        passwordHash,
-        name: body.name,
-        memberships: {
-          create: {
-            role: "owner",
-            workspace: {
-              create: {
-                name: body.workspaceName,
-                slug,
-                timezone: body.timezone,
-                whatsapp: body.whatsapp,
-                businessHours: {
-                  createMany: {
-                    data: [
-                      { weekday: 1, startTime: "09:00", endTime: "19:00" },
-                      { weekday: 2, startTime: "09:00", endTime: "19:00" },
-                      { weekday: 3, startTime: "09:00", endTime: "19:00" },
-                      { weekday: 4, startTime: "09:00", endTime: "19:00" },
-                      { weekday: 5, startTime: "09:00", endTime: "19:00" },
-                      { weekday: 6, startTime: "09:00", endTime: "16:00" }
-                    ]
-                  }
-                },
-                subscription: {
-                  create: {
-                    plan: "trial",
-                    status: "trialing",
-                    paidUntil: trialEndsAt,
-                    trialEndsAt
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      include: { memberships: { include: { workspace: true } } }
-    });
-
-    const session = await issueSession(app, created.id);
-
-    return reply.code(201).send({
-      userId: created.id,
-      ...session,
-      workspaces: created.memberships.map((membership) => ({
-        id: membership.workspaceId,
-        role: membership.role,
-        name: membership.workspace.name,
-        slug: membership.workspace.slug
-      }))
-    });
+    const result = await registerWithPassword(app, body);
+    return reply.code(201).send(result);
   });
 
-  app.post("/auth/login", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (req) => {
+  app.post("/auth/login", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (req, reply) => {
     const body = loginSchema.parse(req.body);
-    const user = await prisma.user.findUnique({
-      where: { email: body.email.toLowerCase() },
-      include: { memberships: { include: { workspace: true } } }
-    });
+    const result = await loginWithPassword(app, body.email, body.password);
 
-    if (!user || !(await argon2.verify(user.passwordHash, body.password))) {
-      throw app.httpErrors.unauthorized("Credenciais inválidas");
+    if ("blocked" in result && result.blocked) {
+      return reply.code(403).send(result);
     }
 
-    await prisma.refreshToken.deleteMany({
-      where: {
-        userId: user.id,
-        OR: [{ expiresAt: { lte: new Date() } }, { revokedAt: { not: null } }]
-      }
-    });
+    return result;
+  });
 
-    const session = await issueSession(app, user.id);
+  app.post("/auth/google", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (req) => {
+    const body = googleSchema.parse(req.body);
+    return authenticateWithGoogle(app, body);
+  });
 
-    return {
-      ...session,
-      workspaces: user.memberships.map((membership) => ({
-        id: membership.workspaceId,
-        role: membership.role,
-        name: membership.workspace.name,
-        slug: membership.workspace.slug,
-        timezone: membership.workspace.timezone
-      }))
-    };
+  app.post("/auth/verify-email", async (req) => {
+    const body = tokenSchema.parse(req.body);
+    return verifyEmailToken(app, body.token);
+  });
+
+  app.post("/auth/resend-verification", async (req) => {
+    const body = emailSchema.parse(req.body);
+    return resendVerificationEmail(app, body.email);
+  });
+
+  app.post("/auth/request-password-reset", async (req) => {
+    const body = emailSchema.parse(req.body);
+    return requestPasswordReset(app, body.email);
+  });
+
+  app.post("/auth/reset-password", async (req) => {
+    const body = resetPasswordSchema.parse(req.body);
+    return resetPassword(app, body.token, body.password);
   });
 
   app.post("/auth/refresh", async (req) => {
     const body = refreshSchema.parse(req.body);
-    let payload: any;
+    let payload: { sub: string };
 
     try {
-      payload = (app as any).refreshJwt.verify(body.refreshToken);
+      payload = (app as any).refreshJwt.verify(body.refreshToken) as { sub: string };
     } catch {
-      throw app.httpErrors.unauthorized("Refresh token inválido");
+      throw app.httpErrors.unauthorized("Refresh token invalido");
     }
 
     const record = await findRefreshTokenRecord(payload.sub, body.refreshToken);
-    if (!record) throw app.httpErrors.unauthorized("Sessão expirada");
+    if (!record) {
+      throw app.httpErrors.unauthorized("Sessao expirada");
+    }
 
     await prisma.refreshToken.update({
       where: { id: record.id },
@@ -184,10 +124,10 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
 
   app.post("/auth/logout", async (req) => {
     const body = refreshSchema.parse(req.body);
-    let payload: any;
+    let payload: { sub: string };
 
     try {
-      payload = (app as any).refreshJwt.verify(body.refreshToken);
+      payload = (app as any).refreshJwt.verify(body.refreshToken) as { sub: string };
     } catch {
       return { ok: true };
     }
@@ -205,23 +145,6 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
 
   app.get("/auth/me", async (req) => {
     await app.auth(req as any);
-    const userId = (req.user as any).sub;
-    const user = await prisma.user.findUniqueOrThrow({
-      where: { id: userId },
-      include: { memberships: { include: { workspace: true } } }
-    });
-
-    return {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      workspaces: user.memberships.map((membership) => ({
-        id: membership.workspaceId,
-        role: membership.role,
-        name: membership.workspace.name,
-        slug: membership.workspace.slug,
-        timezone: membership.workspace.timezone
-      }))
-    };
+    return getMe((req.user as any).sub);
   });
 };

@@ -3,8 +3,8 @@
 ## Layers
 
 - unit tests for scheduler, plans, permissions and dedupe
-- integration tests for booking, payment webhook and tenant boundaries
-- Playwright smoke/E2E for landing, dashboard and public booking
+- integration tests for auth, booking, payment webhook and tenant boundaries
+- Playwright smoke/E2E for landing, auth and public booking error handling
 - manual operational smoke for release validation on Northflank
 
 ## Current automated coverage
@@ -17,9 +17,11 @@
 
 ## Critical scenarios
 
-- login
+- password registration with email verification
+- Google Sign-In with backend token verification
+- password reset and refresh token rotation
 - onboarding summary and workspace profile update
-- public booking with same-origin demo fallback
+- public booking with real tenant slug resolution
 - appointment conflict prevention
 - role enforcement
 - tenant isolation
@@ -30,17 +32,17 @@
 
 - `corepack pnpm test`
 - `corepack pnpm test:e2e`
-- Playwright MCP visual smoke on `/`, `/app`, `/b/demo-beleza`
-- confirm zero console errors on landing and booking demo
+- Playwright MCP visual smoke on `/`, `/auth` and one real `/b/:slug`
+- confirm zero console errors on landing and auth
 
 ## Risk matrix
 
 - High:
-  booking conflict logic, webhook idempotency, tenant isolation
+  auth token lifecycle, booking conflict logic, webhook idempotency, tenant isolation
 - Medium:
   onboarding completeness, dashboard summaries, reminder dispatch
 - Low:
-  static marketing sections, demo content drift
+  static marketing sections, empty states and copy drift
 
 ## Gaps to close next
 

@@ -6,26 +6,21 @@ test("landing page shows premium hero and niche visuals", async ({ page }) => {
   await expect(page.getByRole("heading", { name: /Agenda, WhatsApp e Pix/i })).toBeVisible();
   await expect(page.getByAltText("Mockup do dashboard BELEZAFOCO em desktop")).toBeVisible();
   await expect(page.getByAltText("Barbearias")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Criar conta agora" })).toBeVisible();
 });
 
-test("dashboard loads core operational cards", async ({ page }) => {
-  await page.goto("/app");
+test("auth page exposes real registration and recovery flows", async ({ page }) => {
+  await page.goto("/auth");
 
-  await expect(page.getByRole("heading", { level: 2, name: "Studio Beleza Foco" })).toBeVisible();
-  await expect(page.getByText("Radar de operacao")).toBeVisible();
-  await expect(page.getByText("Lista de espera")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Login, registro e onboarding em fluxo real/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Criar conta" })).toBeVisible();
+  await page.getByRole("button", { name: "Recuperar senha" }).click();
+  await expect(page.getByRole("button", { name: "Enviar link de redefinicao" })).toBeVisible();
 });
 
-test("public booking demo completes Pix-oriented reservation", async ({ page }) => {
-  await page.goto("/b/demo-beleza");
+test("public booking invalid slug shows production-safe error state", async ({ page }) => {
+  await page.goto("/b/slug-inexistente");
 
-  await page.getByRole("button", { name: /Manicure em Gel/i }).click();
-  await page.getByRole("button", { name: /12:15 Camila Rocha/i }).click();
-  await page.getByRole("textbox", { name: /Nome/i }).fill("Ana Demo");
-  await page.getByRole("textbox", { name: /WhatsApp/i }).fill("+5511999998888");
-  await page.getByRole("textbox", { name: /E-mail/i }).fill("ana@demo.local");
-  await page.getByRole("button", { name: "Confirmar agendamento" }).click();
-
-  await expect(page.getByRole("heading", { name: /Falta so concluir o Pix/i })).toBeVisible();
-  await expect(page.getByText(/Pix copia e cola/i)).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Nao foi possivel carregar a pagina/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Tentar novamente" })).toBeVisible();
 });

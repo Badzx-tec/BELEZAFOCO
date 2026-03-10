@@ -6,6 +6,8 @@
 - shared-addon deployments use a dedicated schema suffix, currently `schema=belezafoco`
 - JWT secrets are unique per environment and at least 32 chars
 - public URL matches the final domain
+- `SMTP_USER`, `SMTP_PASSWORD` and `SMTP_FROM` are configured before enabling self-service registration
+- `GOOGLE_CLIENT_ID` is configured before exposing Google Sign-In in production
 - optional Sentry, WhatsApp and Mercado Pago envs are injected through Northflank secrets
 
 ## Security
@@ -20,7 +22,7 @@
 
 - run `corepack pnpm prisma:migrate:deploy` in a manual/job release step
 - if the addon is reused and `public` is not empty, bootstrap the app schema once with the addon admin URI before the first migration
-- run seed only in demo or staging, never automatically in prod
+- run seed only as controlled bootstrap data, never automatically in prod
 - verify `/readyz` after migrations
 - confirm backup policy for Postgres addon
 
@@ -41,13 +43,14 @@
 
 - `corepack pnpm test`
 - `corepack pnpm test:e2e`
-- manual smoke: landing, dashboard, `/b/demo-beleza`, `/healthz`, `/readyz`
+- manual smoke: landing, `/auth`, `/healthz`, `/readyz` and one real public booking slug
 
 ## Smoke checks
 
 - home page renders without console errors
-- dashboard renders without console errors
-- public booking demo completes Pix-style reservation
+- auth page renders login, register and password reset states
+- dashboard renders without console errors after real login
+- public booking renders only for a real tenant slug
 - API health returns `200`
 - readiness returns `200` after migrations
 

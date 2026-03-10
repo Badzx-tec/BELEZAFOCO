@@ -5,6 +5,9 @@
 - JWT access and refresh secrets required
 - refresh tokens persisted and revocable
 - login route rate limited
+- email verification required before first panel access
+- password reset tokens are hashed, one-time and expiring
+- Google Sign-In tokens are verified in the backend against `GOOGLE_CLIENT_ID`
 
 ## Permissions
 

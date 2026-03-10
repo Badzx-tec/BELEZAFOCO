@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Badge, Button, Card, CheckboxField, EmptyState, Field, Input, SectionTag, SkeletonBlock, Textarea } from "../components/ui";
 import { api } from "../lib/api";
-import { createDemoBookingResponse, createDemoSlotPayload, demoPublicWorkspace } from "../lib/demo";
 import { formatCurrency, formatDateLabel, formatDateTime, formatTime, nextDateKeys } from "../lib/format";
 
 type PublicWorkspaceData = {
@@ -79,12 +78,10 @@ function summarizeBusinessHours(businessHours: PublicWorkspaceData["businessHour
 }
 
 export function PublicBookingPage() {
-  const { slug = "demo-beleza" } = useParams();
-  const isDemoSlug = slug === "demo-beleza";
+  const { slug = "" } = useParams();
   const [data, setData] = useState<PublicWorkspaceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [demoMode, setDemoMode] = useState(false);
   const [selectedServiceId, setSelectedServiceId] = useState("");
   const [selectedStaffId, setSelectedStaffId] = useState("");
   const [selectedDate, setSelectedDate] = useState(initialSelectedDate);
@@ -107,22 +104,23 @@ export function PublicBookingPage() {
     setLoading(true);
     setError(null);
 
+    if (!slug) {
+      setData(null);
+      setError("Slug publico ausente.");
+      setLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+
     api<PublicWorkspaceData>(`/public/b/${slug}`)
       .then((payload) => {
         if (!active) return;
         setData(payload);
-        setDemoMode(false);
         setSelectedServiceId((current) => current || payload.services?.at(0)?.id || "");
       })
       .catch((reason) => {
         if (!active) return;
-        if (isDemoSlug) {
-          setData(demoPublicWorkspace);
-          setDemoMode(true);
-          setSelectedServiceId((current) => current || demoPublicWorkspace.services.at(0)?.id || "");
-          return;
-        }
-
         setError(reason.message);
       })
       .finally(() => {
@@ -133,7 +131,7 @@ export function PublicBookingPage() {
     return () => {
       active = false;
     };
-  }, [isDemoSlug, slug]);
+  }, [slug]);
 
   const availableStaff = useMemo(() => {
     if (!data || !selectedServiceId) return [];
@@ -164,16 +162,6 @@ export function PublicBookingPage() {
       ...(selectedStaffId ? { staffMemberId: selectedStaffId } : {})
     });
 
-    if (demoMode) {
-      const payload = createDemoSlotPayload(selectedDate, selectedServiceId, selectedStaffId || undefined);
-      setSlots(payload);
-      setSelectedSlot((current) => (payload.slots.some((item) => item.startAt === current) ? current : ""));
-      setSlotsLoading(false);
-      return () => {
-        active = false;
-      };
-    }
-
     api<SlotPayload>(`/public/b/${slug}/slots?${query.toString()}`)
       .then((payload) => {
         if (!active) return;
@@ -192,7 +180,7 @@ export function PublicBookingPage() {
     return () => {
       active = false;
     };
-  }, [demoMode, selectedDate, selectedServiceId, selectedStaffId, slug]);
+  }, [selectedDate, selectedServiceId, selectedStaffId, slug]);
 
   const services = data?.services ?? [];
   const staffMembers = data?.staffMembers ?? [];
@@ -216,12 +204,6 @@ export function PublicBookingPage() {
     setSubmitError(null);
 
     try {
-      if (demoMode) {
-        await new Promise((resolve) => window.setTimeout(resolve, 700));
-        setResult(createDemoBookingResponse(selectedServiceId));
-        return;
-      }
-
       const idempotencyKey = window.crypto?.randomUUID?.() ?? `${Date.now()}`;
       const response = await api<BookingResponse>(`/public/b/${slug}/book`, {
         method: "POST",
@@ -297,7 +279,6 @@ export function PublicBookingPage() {
                   <Badge tone="accent">Resposta rapida por WhatsApp</Badge>
                   <Badge>{data.workspace.timezone}</Badge>
                   <Badge tone="warning">Antecedencia minima de {data.workspace.minAdvanceMinutes / 60}h</Badge>
-                  {demoMode ? <Badge tone="success">Modo demo ativo</Badge> : null}
                 </div>
               </div>
 
