@@ -35,7 +35,7 @@ RUN corepack pnpm build
 FROM node:20-alpine AS api
 WORKDIR /app
 ENV NODE_ENV=production
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
 COPY --from=build /app/apps/api ./apps/api
 COPY --from=build /app/packages/shared ./packages/shared
