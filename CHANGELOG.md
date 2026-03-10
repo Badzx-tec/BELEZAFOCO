@@ -12,6 +12,8 @@
 - added Playwright smoke coverage for landing, dashboard and public booking demo
 - hardened the API with `@fastify/helmet`, production proxy awareness and Mercado Pago webhook signature validation helpers
 - replaced the mock-only Mercado Pago Pix provider with a real API-backed flow plus official webhook reconciliation
+- tracked `pnpm-lock.yaml` in Git so Northflank Docker builds receive a complete workspace context
+- disabled `index.html` auto-registration in `@fastify/static` to avoid duplicate `HEAD /` conflicts during production boot
 - created production documentation set in `docs/01` through `docs/10`
 - created Linear project, PRD document and backlog issues for the productionization effort
 

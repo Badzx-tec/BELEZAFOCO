@@ -141,7 +141,8 @@ export function buildApp() {
   if (webDist) {
     app.register(fastifyStatic, {
       root: webDist,
-      wildcard: false
+      wildcard: false,
+      index: false
     });
 
     const spaEntry = async (_request: unknown, reply: any) => {
