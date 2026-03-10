@@ -1,0 +1,49 @@
+# Testing Strategy
+
+## Layers
+
+- unit tests for scheduler, plans, permissions and dedupe
+- integration tests for booking, payment webhook and tenant boundaries
+- Playwright smoke/E2E for landing, dashboard and public booking
+- manual operational smoke for release validation on Northflank
+
+## Current automated coverage
+
+- `apps/api/tests/scheduler.test.ts`
+- `apps/api/tests/plan.test.ts`
+- `apps/api/tests/permissions.test.ts`
+- `apps/api/tests/reminder-dedupe.test.ts`
+- `tests/e2e/belezafoco.smoke.spec.ts`
+
+## Critical scenarios
+
+- login
+- onboarding summary and workspace profile update
+- public booking with same-origin demo fallback
+- appointment conflict prevention
+- role enforcement
+- tenant isolation
+- payment webhook idempotency
+- dashboard smoke states
+
+## Regression checklist
+
+- `corepack pnpm test`
+- `corepack pnpm test:e2e`
+- Playwright MCP visual smoke on `/`, `/app`, `/b/demo-beleza`
+- confirm zero console errors on landing and booking demo
+
+## Risk matrix
+
+- High:
+  booking conflict logic, webhook idempotency, tenant isolation
+- Medium:
+  onboarding completeness, dashboard summaries, reminder dispatch
+- Low:
+  static marketing sections, demo content drift
+
+## Gaps to close next
+
+- live DB-backed API smoke in CI or staging
+- payment provider integration tests with sandbox credentials
+- WhatsApp provider integration tests with webhook replay fixtures

@@ -488,7 +488,15 @@ export async function createPublicBooking(input: {
       }
     });
 
-    let payment: { externalId: string; qrCode: string; pixCopyPaste: string; expiresAt?: Date | null; idempotencyKey?: string | null } | null = null;
+    let payment: {
+      externalId: string;
+      qrCode: string;
+      pixCopyPaste: string;
+      ticketUrl?: string | null;
+      expiresAt?: Date | null;
+      idempotencyKey?: string | null;
+      providerPayload?: string | null;
+    } | null = null;
 
     if (status === "pending_payment" && depositAmount) {
       const provider = new MercadoPagoProvider();
@@ -497,7 +505,8 @@ export async function createPublicBooking(input: {
         description: `Sinal ${service.name}`,
         payerName: client.name,
         payerEmail: client.email ?? undefined,
-        idempotencyKey: input.idempotencyKey ?? appointment.id
+        idempotencyKey: input.idempotencyKey ?? appointment.id,
+        externalReference: appointment.id
       });
 
       await tx.payment.create({
@@ -509,6 +518,7 @@ export async function createPublicBooking(input: {
           externalId: payment.externalId,
           qrCode: payment.qrCode,
           pixCopyPaste: payment.pixCopyPaste,
+          providerPayload: payment.providerPayload ?? null,
           expiresAt: payment.expiresAt ?? paymentExpiresAt,
           idempotencyKey: payment.idempotencyKey ?? input.idempotencyKey ?? appointment.id
         }
@@ -544,6 +554,7 @@ export async function createPublicBooking(input: {
             externalId: payment.externalId,
             qrCode: payment.qrCode,
             pixCopyPaste: payment.pixCopyPaste,
+            ticketUrl: payment.ticketUrl ?? null,
             expiresAt: (payment.expiresAt ?? paymentExpiresAt)?.toISOString() ?? null
           }
         : null

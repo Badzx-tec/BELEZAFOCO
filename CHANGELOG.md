@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-03-10
+
+- hardened workspace scripts to use `corepack pnpm` and fixed recursive test execution for packages without unit tests
+- replaced the old Alpine Docker image with a Debian slim multi-stage image prepared for Prisma and Northflank combined-service deploys
+- exposed `/healthz` and `/readyz` and made Fastify serve the built frontend for same-origin production hosting
+- switched the frontend API client to same-origin by default
+- added local marketing and niche SVG assets plus favicon for stronger visual positioning
+- upgraded landing and public booking with richer visual sections and demo-safe booking fallback
+- added optional env-driven Sentry initialization to backend and frontend
+- added Playwright smoke coverage for landing, dashboard and public booking demo
+- hardened the API with `@fastify/helmet`, production proxy awareness and Mercado Pago webhook signature validation helpers
+- replaced the mock-only Mercado Pago Pix provider with a real API-backed flow plus official webhook reconciliation
+- created production documentation set in `docs/01` through `docs/10`
+- created Linear project, PRD document and backlog issues for the productionization effort
+
 ## 2026-03-09
 
 - documentada a auditoria tecnica do repositorio

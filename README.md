@@ -7,6 +7,7 @@ SaaS multi-tenant para barbearias, salões, nail designers, estéticas e negóci
 - Backend: Node 20 + TypeScript + Fastify + Prisma + Zod + JWT
 - Frontend: React + Vite + Tailwind
 - Banco principal: PostgreSQL
+- Observabilidade: Sentry opcional por ambiente
 - Jobs: comandos Node agendados por cron/systemd timer
 
 ## Núcleo do produto
@@ -27,14 +28,24 @@ SaaS multi-tenant para barbearias, salões, nail designers, estéticas e negóci
 ```bash
 cp .env.example .env
 docker compose up -d postgres mailhog
-pnpm install
-pnpm prisma:generate
-pnpm prisma:migrate
-pnpm seed
-pnpm dev
+corepack pnpm install
+corepack pnpm prisma:generate
+corepack pnpm prisma:migrate
+corepack pnpm seed
+corepack pnpm dev
 ```
 
 API em `http://localhost:3333` e front em `http://localhost:5173`.
+
+## Build e testes
+
+```bash
+corepack pnpm build
+corepack pnpm test
+corepack pnpm test:e2e
+```
+
+Os smoke tests E2E usam o booking demo em `/b/demo-beleza`, entao a camada visual pode ser validada mesmo sem backend local.
 
 ## Jobs
 
@@ -42,10 +53,4 @@ API em `http://localhost:3333` e front em `http://localhost:5173`.
 node apps/api/dist/src/jobs/sendReminders.js
 node apps/api/dist/src/jobs/reconcilePayments.js
 node apps/api/dist/src/jobs/cleanup.js
-```
-
-## Testes
-
-```bash
-pnpm --filter @belezafoco/api test
 ```

@@ -19,7 +19,11 @@ const envSchema = z.object({
   MERCADO_PAGO_ENABLED: z.coerce.boolean().default(false),
   MP_ACCESS_TOKEN: z.string().optional(),
   MP_WEBHOOK_SECRET: z.string().optional(),
-  PUBLIC_URL: z.string().default("http://localhost:5173")
+  PUBLIC_URL: z.string().default("http://localhost:5173"),
+  SENTRY_DSN_API: z.string().optional(),
+  SENTRY_ENVIRONMENT: z.string().default("development"),
+  SENTRY_RELEASE: z.string().optional(),
+  SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().default(0.1)
 });
 
 export const env = envSchema.parse(process.env);
