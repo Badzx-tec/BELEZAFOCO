@@ -7,7 +7,6 @@ dist
 coverage
 playwright-report
 test-results
-pnpm-lock.yaml
 apps/api/prisma/dev.db
 apps/api/prisma/dev.db-*
 *.tsbuildinfo
