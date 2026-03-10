@@ -7,6 +7,7 @@ import { enforcePlan } from "../../lib/plan.js";
 import { generateSlots, intersectWindows, type AppointmentIntervalInput } from "../../lib/scheduler.js";
 import { endOfZonedDay, startOfZonedDay, zonedDateKey, zonedDateTime, zonedWeekday } from "../../lib/timezone.js";
 import { MercadoPagoProvider } from "../payments/provider.js";
+import { DEMO_PUBLIC_SLUG, createDemoPublicBooking, createDemoPublicSlots, demoPublicWorkspaceData } from "./demo.js";
 
 type DbClient = Prisma.TransactionClient | typeof prisma;
 
@@ -63,6 +64,8 @@ type StaffRecord = {
   exceptions: Array<{ startAt: Date; endAt: Date; reason: string | null }>;
 };
 
+export class PublicNotFoundError extends Error {}
+
 function calculateDepositAmount(service: ServiceRecord) {
   if (!service.depositEnabled) return null;
   if (service.depositType === "percent") {
@@ -100,7 +103,7 @@ function buildAvailabilityWindows(availabilities: Array<{ startTime: string; end
 }
 
 async function getWorkspaceBySlug(db: DbClient, slug: string) {
-  return db.workspace.findUniqueOrThrow({
+  const workspace = await db.workspace.findUnique({
     where: { slug },
     select: {
       id: true,
@@ -117,11 +120,17 @@ async function getWorkspaceBySlug(db: DbClient, slug: string) {
       minAdvanceMinutes: true,
       maxAdvanceDays: true
     }
-  }) as Promise<WorkspaceRecord>;
+  });
+
+  if (!workspace) {
+    throw new PublicNotFoundError("Espaco nao encontrado");
+  }
+
+  return workspace as WorkspaceRecord;
 }
 
 async function getServiceForWorkspace(db: DbClient, workspaceId: string, serviceId: string) {
-  return db.service.findFirstOrThrow({
+  const service = await db.service.findFirst({
     where: { id: serviceId, workspaceId, active: true, onlineBookingEnabled: true },
     select: {
       id: true,
@@ -143,7 +152,24 @@ async function getServiceForWorkspace(db: DbClient, workspaceId: string, service
       featured: true,
       onlineBookingEnabled: true
     }
-  }) as Promise<ServiceRecord>;
+  });
+
+  if (!service) {
+    throw new PublicNotFoundError("Servico nao encontrado");
+  }
+
+  return service as ServiceRecord;
+}
+
+async function shouldUseDemoWorkspace(slug: string) {
+  if (slug !== DEMO_PUBLIC_SLUG) return false;
+
+  const workspace = await prisma.workspace.findUnique({
+    where: { slug },
+    select: { id: true }
+  });
+
+  return !workspace;
 }
 
 async function getEligibleStaff(db: DbClient, workspaceId: string, serviceId: string, weekday: number, dayStart: Date, dayEnd: Date, staffMemberId?: string) {
@@ -281,6 +307,10 @@ async function getDailySlotState(db: DbClient, workspace: WorkspaceRecord, servi
 }
 
 export async function getPublicWorkspaceData(slug: string) {
+  if (await shouldUseDemoWorkspace(slug)) {
+    return demoPublicWorkspaceData;
+  }
+
   const workspace = await getWorkspaceBySlug(prisma, slug);
   const [services, staffMembers, businessHours] = await Promise.all([
     prisma.service.findMany({
@@ -335,6 +365,10 @@ export async function getPublicWorkspaceData(slug: string) {
 }
 
 export async function getPublicSlots(input: { slug: string; serviceId: string; date: string; staffMemberId?: string }) {
+  if (await shouldUseDemoWorkspace(input.slug)) {
+    return createDemoPublicSlots(input.date, input.serviceId, input.staffMemberId);
+  }
+
   const workspace = await getWorkspaceBySlug(prisma, input.slug);
   const service = await getServiceForWorkspace(prisma, workspace.id, input.serviceId);
 
@@ -389,6 +423,15 @@ export async function createPublicBooking(input: {
 }) {
   if (!input.policyAccepted) {
     throw new Error("A política de agendamento precisa ser aceita");
+  }
+
+  if (await shouldUseDemoWorkspace(input.slug)) {
+    const booking = createDemoPublicBooking(input.serviceId);
+    if (!booking) {
+      throw new PublicNotFoundError("Servico nao encontrado");
+    }
+
+    return booking;
   }
 
   const workspace = await getWorkspaceBySlug(prisma, input.slug);

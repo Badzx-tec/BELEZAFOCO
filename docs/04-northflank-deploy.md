@@ -7,6 +7,15 @@
 - one manual migration job
 - one optional demo seed job
 
+## Verified deployment
+
+- public URL validated on March 10, 2026: `https://p03--belezafoco-api--fdzfclqyqq99.code.run`
+- verified endpoints:
+  - `/`
+  - `/b/demo-beleza`
+  - `/healthz`
+  - `/readyz`
+
 ## Service setup
 
 1. Create a combined service from Git.
@@ -71,6 +80,8 @@ corepack pnpm seed
 ```
 
 Use only for demo or staging environments.
+
+If the demo seed has not been executed yet, the public slug `demo-beleza` falls back to a server-side demo payload so the commercial flow still loads cleanly in Northflank.
 
 ## Deploy flow
 

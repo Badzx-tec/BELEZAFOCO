@@ -1,11 +1,19 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { createPublicBooking, getPublicSlots, getPublicWorkspaceData } from "./service.js";
+import { PublicNotFoundError, createPublicBooking, getPublicSlots, getPublicWorkspaceData } from "./service.js";
 
 export const publicRoutes: FastifyPluginAsync = async (app) => {
   app.get("/public/b/:slug", async (req) => {
     const { slug } = z.object({ slug: z.string() }).parse(req.params);
-    return getPublicWorkspaceData(slug);
+    try {
+      return await getPublicWorkspaceData(slug);
+    } catch (error) {
+      if (error instanceof PublicNotFoundError) {
+        throw app.httpErrors.notFound(error.message);
+      }
+
+      throw error;
+    }
   });
 
   app.get("/public/b/:slug/slots", async (req) => {
@@ -17,7 +25,15 @@ export const publicRoutes: FastifyPluginAsync = async (app) => {
       })
       .parse(req.query);
     const { slug } = z.object({ slug: z.string() }).parse(req.params);
-    return getPublicSlots({ slug, ...query });
+    try {
+      return await getPublicSlots({ slug, ...query });
+    } catch (error) {
+      if (error instanceof PublicNotFoundError) {
+        throw app.httpErrors.notFound(error.message);
+      }
+
+      throw error;
+    }
   });
 
   app.post("/public/b/:slug/book", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (req) => {
@@ -45,6 +61,10 @@ export const publicRoutes: FastifyPluginAsync = async (app) => {
         idempotencyKey: typeof idempotencyKey === "string" ? idempotencyKey : undefined
       });
     } catch (error) {
+      if (error instanceof PublicNotFoundError) {
+        throw app.httpErrors.notFound(error.message);
+      }
+
       throw app.httpErrors.conflict((error as Error).message);
     }
   });
