@@ -1,17 +1,18 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["tracing"]
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 enum Role {
   owner
   manager
-  staff
   receptionist
+  staff
 }
 
 enum PriceType {
@@ -41,7 +42,9 @@ enum PaymentStatus {
   pending
   paid
   failed
+  expired
   refunded
+  cancelled
 }
 
 enum SubscriptionPlan {
@@ -50,47 +53,94 @@ enum SubscriptionPlan {
   pro
 }
 
+enum SubscriptionStatus {
+  trialing
+  active
+  past_due
+  paused
+  cancelled
+}
+
+enum BookingSource {
+  public
+  admin
+  manual
+  import
+}
+
+enum MessageChannel {
+  whatsapp
+  email
+}
+
 model User {
-  id           String       @id @default(cuid())
-  email        String       @unique
-  passwordHash String
-  name         String
-  createdAt    DateTime     @default(now())
-  memberships  Membership[]
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String
+  name          String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  memberships   Membership[]
   refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]     @relation("AuditActor")
+  staffProfiles StaffMember[]
 }
 
 model RefreshToken {
-  id        String   @id @default(cuid())
-  tokenHash String   @unique
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
   userId    String
+  userAgent String?
+  ipAddress String?
   expiresAt DateTime
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Workspace {
-  id                     String @id @default(cuid())
-  name                   String
-  slug                   String @unique
-  timezone               String @default("America/Sao_Paulo")
-  address                String?
-  minAdvanceMinutes      Int @default(120)
-  maxAdvanceDays         Int @default(30)
-  freeCancelHours        Int @default(24)
-  lateCancelFeePercent   Int @default(0)
-  noShowFeePercent       Int @default(0)
-  createdAt              DateTime @default(now())
-  memberships            Membership[]
-  services               Service[]
-  staffMembers           StaffMember[]
-  resources              Resource[]
-  appointments           Appointment[]
-  clients                Client[]
-  templates              MessageTemplate[]
-  waitlistEntries        WaitlistEntry[]
-  subscription           WorkspaceSubscription?
-  auditLogs              AuditLog[]
-  businessHours          BusinessHour[]
+  id                    String                  @id @default(cuid())
+  name                  String
+  slug                  String                  @unique
+  timezone              String                  @default("America/Sao_Paulo")
+  address               String?
+  whatsapp              String?
+  contactEmail          String?
+  logoUrl               String?
+  brandPrimary          String                  @default("#111827")
+  brandAccent           String                  @default("#c48b5a")
+  about                 String?
+  bookingPolicy         String?
+  checkInPolicy         String?
+  publicBookingEnabled  Boolean                 @default(true)
+  minAdvanceMinutes     Int                     @default(120)
+  maxAdvanceDays        Int                     @default(30)
+  freeCancelHours       Int                     @default(24)
+  lateCancelFeePercent  Int                     @default(0)
+  noShowFeePercent      Int                     @default(0)
+  slotIntervalMinutes   Int                     @default(15)
+  onboardingStep        Int                     @default(1)
+  onboardingCompletedAt DateTime?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  memberships           Membership[]
+  businessHours         BusinessHour[]
+  closures              WorkspaceClosure[]
+  services              Service[]
+  staffMembers          StaffMember[]
+  resources             Resource[]
+  clients               Client[]
+  appointments          Appointment[]
+  appointmentSegments   AppointmentSegment[]
+  templates             MessageTemplate[]
+  messageDeliveries     MessageDelivery[]
+  waitlistEntries       WaitlistEntry[]
+  subscription          WorkspaceSubscription?
+  auditLogs             AuditLog[]
+  idempotencyKeys       IdempotencyKey[]
+  webhookEvents         WebhookEvent[]
 }
 
 model Membership {
@@ -98,199 +148,357 @@ model Membership {
   userId      String
   workspaceId String
   role        Role
+  joinedAt    DateTime  @default(now())
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
   @@unique([userId, workspaceId])
+  @@index([workspaceId, role])
 }
 
 model BusinessHour {
-  id          String @id @default(cuid())
+  id          String    @id @default(cuid())
   workspaceId String
   weekday     Int
   startTime   String
   endTime     String
-  workspace   Workspace @relation(fields:[workspaceId], references:[id], onDelete: Cascade)
+  isClosed    Boolean   @default(false)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, weekday])
+}
+
+model WorkspaceClosure {
+  id          String    @id @default(cuid())
+  workspaceId String
+  startsAt    DateTime
+  endsAt      DateTime
+  reason      String
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, startsAt, endsAt])
 }
 
 model Service {
-  id                  String @id @default(cuid())
+  id                  String         @id @default(cuid())
   workspaceId         String
   name                String
+  slug                String
+  description         String?
   category            String
   durationMinutes     Int
-  bufferBeforeMinutes Int @default(0)
-  bufferAfterMinutes  Int @default(0)
-  priceType           PriceType
+  prepMinutes         Int            @default(0)
+  finishMinutes       Int            @default(0)
+  bufferBeforeMinutes Int            @default(0)
+  bufferAfterMinutes  Int            @default(0)
+  priceType           PriceType      @default(fixed)
   priceValue          Int?
-  depositEnabled      Boolean @default(false)
+  depositEnabled      Boolean        @default(false)
   depositType         DepositType?
   depositValue        Int?
   requiredResourceId  String?
-  active              Boolean @default(true)
-  workspace           Workspace @relation(fields: [workspaceId], references:[id], onDelete: Cascade)
-  requiredResource    Resource? @relation("RequiredResource", fields:[requiredResourceId], references:[id])
+  featured            Boolean        @default(false)
+  active              Boolean        @default(true)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  workspace           Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  requiredResource    Resource?      @relation("RequiredResource", fields: [requiredResourceId], references: [id], onDelete: SetNull)
   staffServices       StaffService[]
   appointments        Appointment[]
+  waitlistEntries     WaitlistEntry[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId, active])
+  @@index([workspaceId, category])
 }
 
 model StaffMember {
-  id           String @id @default(cuid())
-  workspaceId  String
-  name         String
-  contact      String?
-  workspace    Workspace @relation(fields:[workspaceId], references:[id], onDelete: Cascade)
-  availabilities StaffAvailability[]
-  exceptions   StaffException[]
-  staffServices StaffService[]
-  appointments Appointment[]
+  id                String               @id @default(cuid())
+  workspaceId       String
+  userId            String?
+  name              String
+  slug              String
+  contact           String?
+  bio               String?
+  color             String               @default("#0f172a")
+  commissionPercent Int                  @default(0)
+  isBookable        Boolean              @default(true)
+  active            Boolean              @default(true)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  workspace         Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user              User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  availabilities    StaffAvailability[]
+  exceptions        StaffException[]
+  staffServices     StaffService[]
+  appointments      Appointment[]
+  segments          AppointmentSegment[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId, active])
 }
 
 model StaffService {
   staffMemberId String
   serviceId     String
-  staffMember   StaffMember @relation(fields:[staffMemberId], references:[id], onDelete: Cascade)
-  service       Service @relation(fields:[serviceId], references:[id], onDelete: Cascade)
+  staffMember   StaffMember @relation(fields: [staffMemberId], references: [id], onDelete: Cascade)
+  service       Service     @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
   @@id([staffMemberId, serviceId])
 }
 
 model StaffAvailability {
-  id            String @id @default(cuid())
+  id            String      @id @default(cuid())
   staffMemberId String
   weekday       Int
   startTime     String
   endTime       String
-  staffMember   StaffMember @relation(fields:[staffMemberId], references:[id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+  staffMember   StaffMember @relation(fields: [staffMemberId], references: [id], onDelete: Cascade)
+
+  @@index([staffMemberId, weekday])
 }
 
 model StaffException {
-  id            String @id @default(cuid())
+  id            String      @id @default(cuid())
   staffMemberId String
-  startAt       DateTime
-  endAt         DateTime
+  startsAt      DateTime
+  endsAt        DateTime
   reason        String?
-  staffMember   StaffMember @relation(fields:[staffMemberId], references:[id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+  staffMember   StaffMember @relation(fields: [staffMemberId], references: [id], onDelete: Cascade)
+
+  @@index([staffMemberId, startsAt, endsAt])
 }
 
 model Resource {
-  id            String @id @default(cuid())
-  workspaceId   String
-  name          String
-  type          String
-  workspace     Workspace @relation(fields:[workspaceId], references:[id], onDelete: Cascade)
-  services      Service[] @relation("RequiredResource")
-  appointments  Appointment[]
+  id           String               @id @default(cuid())
+  workspaceId  String
+  name         String
+  slug         String
+  type         String
+  capacity     Int                  @default(1)
+  active       Boolean              @default(true)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  workspace    Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  services     Service[]            @relation("RequiredResource")
+  appointments Appointment[]
+  segments     AppointmentSegment[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId, active])
 }
 
 model Client {
-  id               String @id @default(cuid())
-  workspaceId      String
-  name             String
-  whatsapp         String
-  email            String?
-  notes            String?
-  whatsappOptInAt  DateTime?
-  whatsappOptInIp  String?
-  whatsappOptInMethod String?
-  workspace        Workspace @relation(fields:[workspaceId], references:[id], onDelete: Cascade)
-  appointments     Appointment[]
-  waitlistEntries  WaitlistEntry[]
+  id                   String            @id @default(cuid())
+  workspaceId          String
+  name                 String
+  whatsapp             String
+  email                String?
+  notes                String?
+  tags                 Json?
+  lastVisitAt          DateTime?
+  whatsappOptInAt      DateTime?
+  whatsappOptInIp      String?
+  whatsappOptInMethod  String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  workspace            Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  appointments         Appointment[]
+  waitlistEntries      WaitlistEntry[]
+  messageDeliveries    MessageDelivery[]
+
   @@unique([workspaceId, whatsapp])
+  @@index([workspaceId, lastVisitAt])
 }
 
 model Appointment {
-  id            String @id @default(cuid())
+  id             String             @id @default(cuid())
+  workspaceId    String
+  serviceId      String
+  staffMemberId  String
+  resourceId     String?
+  clientId       String
+  source         BookingSource      @default(public)
+  status         AppointmentStatus
+  startAt        DateTime
+  endAt          DateTime
+  priceAmount    Int?
+  depositAmount  Int?
+  depositProvider String?
+  depositStatus  PaymentStatus?
+  notesInternal  String?
+  notesClient    String?
+  cancelledAt    DateTime?
+  cancelledReason String?
+  confirmedAt    DateTime?
+  completedAt    DateTime?
+  noShowMarkedAt DateTime?
+  cancelToken    String?            @unique
+  idempotencyKey String?            @unique
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  workspace      Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  service        Service            @relation(fields: [serviceId], references: [id])
+  staffMember    StaffMember        @relation(fields: [staffMemberId], references: [id])
+  resource       Resource?          @relation(fields: [resourceId], references: [id], onDelete: SetNull)
+  client         Client             @relation(fields: [clientId], references: [id])
+  payments       Payment[]
+  deliveries     MessageDelivery[]
+  segments       AppointmentSegment[]
+
+  @@index([workspaceId, startAt])
+  @@index([staffMemberId, startAt])
+  @@index([clientId, startAt])
+  @@index([resourceId, startAt])
+}
+
+model AppointmentSegment {
+  id            String      @id @default(cuid())
+  appointmentId String
   workspaceId   String
-  serviceId     String
   staffMemberId String
   resourceId    String?
-  clientId      String
-  status        AppointmentStatus
-  startAt       DateTime
-  endAt         DateTime
-  depositAmount Int?
-  depositProvider String?
-  depositStatus PaymentStatus?
-  cancelToken   String? @unique
-  createdAt     DateTime @default(now())
-  workspace     Workspace @relation(fields:[workspaceId], references:[id], onDelete: Cascade)
-  service       Service @relation(fields:[serviceId], references:[id])
-  staffMember   StaffMember @relation(fields:[staffMemberId], references:[id])
-  resource      Resource? @relation(fields:[resourceId], references:[id])
-  client        Client @relation(fields:[clientId], references:[id])
-  payments      Payment[]
-  reminders     ReminderLog[]
-  @@unique([staffMemberId, startAt])
-  @@unique([resourceId, startAt])
+  resourceUnit  Int?
+  startsAt      DateTime
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  workspace     Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  staffMember   StaffMember @relation(fields: [staffMemberId], references: [id], onDelete: Cascade)
+  resource      Resource?   @relation(fields: [resourceId], references: [id], onDelete: SetNull)
+
+  @@unique([staffMemberId, startsAt])
+  @@unique([resourceId, startsAt, resourceUnit])
+  @@index([workspaceId, startsAt])
 }
 
 model Payment {
-  id            String @id @default(cuid())
-  appointmentId String
-  provider      String
-  externalId    String?
-  amount        Int
-  status        PaymentStatus
-  qrCode        String?
-  pixCopyPaste  String?
-  createdAt     DateTime @default(now())
-  appointment   Appointment @relation(fields:[appointmentId], references:[id], onDelete: Cascade)
+  id              String         @id @default(cuid())
+  appointmentId   String
+  provider        String
+  externalId      String?        @unique
+  idempotencyKey  String?        @unique
+  amount          Int
+  feeAmount       Int?
+  status          PaymentStatus
+  qrCode          String?
+  pixCopyPaste    String?
+  expiresAt       DateTime?
+  paidAt          DateTime?
+  providerPayload Json?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  appointment     Appointment    @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
 }
 
 model WaitlistEntry {
-  id            String @id @default(cuid())
-  workspaceId   String
-  clientId      String
-  serviceId     String
-  staffMemberId String?
-  desiredDate   DateTime
-  token         String @unique
+  id             String      @id @default(cuid())
+  workspaceId    String
+  clientId       String
+  serviceId      String
+  staffMemberId  String?
+  desiredDate    DateTime
+  token          String      @unique
   tokenExpiresAt DateTime
-  active        Boolean @default(true)
-  workspace     Workspace @relation(fields:[workspaceId], references:[id], onDelete: Cascade)
-  client        Client @relation(fields:[clientId], references:[id], onDelete: Cascade)
-  service       Service @relation(fields:[serviceId], references:[id])
+  active         Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  workspace      Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client         Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  service        Service     @relation(fields: [serviceId], references: [id])
 }
 
 model MessageTemplate {
-  id            String @id @default(cuid())
-  workspaceId   String
-  type          String
-  templateName  String
-  language      String @default("pt_BR")
-  body          String
-  workspace     Workspace @relation(fields:[workspaceId], references:[id], onDelete: Cascade)
-  @@unique([workspaceId, type])
+  id           String         @id @default(cuid())
+  workspaceId  String
+  channel      MessageChannel
+  type         String
+  templateName String
+  language     String         @default("pt_BR")
+  body         String
+  active       Boolean        @default(true)
+  workspace    Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, channel, type])
 }
 
-model ReminderLog {
-  id            String @id @default(cuid())
-  appointmentId String
+model MessageDelivery {
+  id            String         @id @default(cuid())
+  workspaceId   String
+  appointmentId String?
+  clientId      String?
+  channel       MessageChannel
   type          String
   provider      String
+  dedupeKey     String         @unique
   status        String
   response      String?
-  sentAt        DateTime @default(now())
-  appointment   Appointment @relation(fields:[appointmentId], references:[id], onDelete: Cascade)
-  @@unique([appointmentId, type])
+  sentAt        DateTime?
+  createdAt     DateTime       @default(now())
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  appointment   Appointment?   @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  client        Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
 }
 
 model WorkspaceSubscription {
-  id            String @id @default(cuid())
-  workspaceId   String @unique
-  plan          SubscriptionPlan @default(trial)
-  paidUntil     DateTime
-  appointmentsThisMonth Int @default(0)
-  workspace     Workspace @relation(fields:[workspaceId], references:[id], onDelete: Cascade)
+  id                        String             @id @default(cuid())
+  workspaceId               String             @unique
+  plan                      SubscriptionPlan   @default(trial)
+  status                    SubscriptionStatus @default(trialing)
+  trialEndsAt               DateTime
+  paidUntil                 DateTime
+  staffLimit                Int                @default(3)
+  resourceLimit             Int                @default(2)
+  monthlyAppointmentsLimit  Int                @default(300)
+  appointmentsThisMonth     Int                @default(0)
+  createdAt                 DateTime           @default(now())
+  updatedAt                 DateTime           @updatedAt
+  workspace                 Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
 model AuditLog {
-  id            String @id @default(cuid())
-  workspaceId   String
-  actorUserId   String?
-  action        String
-  entityType    String
-  entityId      String
-  payload       String
-  createdAt     DateTime @default(now())
-  workspace     Workspace @relation(fields:[workspaceId], references:[id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  workspaceId String
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String
+  payload     Json
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actorUser   User?     @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+}
+
+model IdempotencyKey {
+  id           String    @id @default(cuid())
+  workspaceId  String?
+  scope        String
+  key          String    @unique
+  requestHash  String?
+  responseBody Json?
+  statusCode   Int?
+  createdAt    DateTime  @default(now())
+  workspace    Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, scope])
+}
+
+model WebhookEvent {
+  id          String    @id @default(cuid())
+  workspaceId String?
+  provider    String
+  eventType   String
+  externalId  String
+  signature   String?
+  payload     Json
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, eventType, externalId])
+  @@index([workspaceId, createdAt])
 }

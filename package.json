@@ -3,13 +3,16 @@
   "private": true,
   "version": "1.0.0",
   "packageManager": "pnpm@9.12.1",
+  "devDependencies": {
+    "@types/node": "^24.3.0"
+  },
   "scripts": {
-    "build": "pnpm -r build",
-    "dev": "pnpm --parallel --filter @belezafoco/api --filter @belezafoco/web dev",
-    "test": "pnpm -r test",
-    "lint": "pnpm -r lint",
-    "prisma:migrate": "pnpm --filter @belezafoco/api prisma:migrate",
-    "prisma:generate": "pnpm --filter @belezafoco/api prisma:generate",
-    "seed": "pnpm --filter @belezafoco/api seed"
+    "build": "corepack pnpm -r build",
+    "dev": "corepack pnpm --parallel --filter @belezafoco/api --filter @belezafoco/web dev",
+    "test": "corepack pnpm -r test",
+    "lint": "corepack pnpm -r lint",
+    "prisma:migrate": "corepack pnpm --filter @belezafoco/api prisma:migrate",
+    "prisma:generate": "corepack pnpm --filter @belezafoco/api prisma:generate",
+    "seed": "corepack pnpm --filter @belezafoco/api seed"
   }
 }

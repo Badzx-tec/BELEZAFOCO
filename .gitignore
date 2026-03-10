@@ -9,3 +9,5 @@ pnpm-lock.yaml
 apps/api/prisma/dev.db
 apps/api/prisma/dev.db-*
 .DS_Store
+*.log
+*-dev.log

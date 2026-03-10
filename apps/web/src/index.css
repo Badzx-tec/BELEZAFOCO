@@ -1,4 +1,62 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-body { @apply bg-slate-50 text-slate-900; }
+
+:root {
+  --brand-primary: #111827;
+  --brand-accent: #c48b5a;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-stone-50 text-slate-900 antialiased;
+    font-family: "Manrope", "Segoe UI", sans-serif;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: "Fraunces", Georgia, serif;
+    letter-spacing: -0.03em;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(15, 23, 42, 0.28) transparent;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: "Fraunces", Georgia, serif;
+  }
+
+  .field-control:focus {
+    border-color: var(--brand-accent);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand-accent) 16%, transparent);
+  }
+
+  .bg-brand-accent {
+    background-color: var(--brand-accent);
+  }
+
+  .border-brand-accent {
+    border-color: var(--brand-accent);
+  }
+
+  .focus-brand {
+    @apply focus:ring-4;
+    --tw-ring-color: color-mix(in srgb, var(--brand-accent) 18%, transparent);
+  }
+
+  .shadow-soft {
+    box-shadow: 0 18px 50px rgba(15, 23, 42, 0.09);
+  }
+}

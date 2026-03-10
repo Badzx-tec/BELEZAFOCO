@@ -1,75 +1,187 @@
 import { FastifyPluginAsync } from "fastify";
-import { prisma } from "../../lib/prisma.js";
-import { z } from "zod";
-import { generateSlots } from "../../lib/scheduler.js";
-import { addMinutes, startOfDay, endOfDay } from "date-fns";
-import { env } from "../../config/env.js";
-import { MercadoPagoProvider } from "../payments/provider.js";
 import { randomUUID } from "node:crypto";
+import { z } from "zod";
+import { prisma } from "../../lib/prisma.js";
+import { createAppointment, getPublicBookingContext, listAvailableSlots } from "../../lib/booking.js";
+import { rememberIdempotency } from "../../lib/idempotency.js";
+import { sha256 } from "../../lib/crypto.js";
+import { MercadoPagoProvider } from "../payments/provider.js";
 
 export const publicRoutes: FastifyPluginAsync = async (app) => {
   app.get("/public/b/:slug", async (req) => {
     const { slug } = z.object({ slug: z.string() }).parse(req.params);
-    const ws = await prisma.workspace.findUniqueOrThrow({ where: { slug } });
-    const services = await prisma.service.findMany({ where: { workspaceId: ws.id, active: true } });
-    return { workspace: ws, services };
+    const { workspace, services, staffMembers } = await getPublicBookingContext(slug);
+
+    return {
+      workspace: {
+        id: workspace.id,
+        name: workspace.name,
+        slug: workspace.slug,
+        timezone: workspace.timezone,
+        address: workspace.address,
+        whatsapp: workspace.whatsapp,
+        contactEmail: workspace.contactEmail,
+        logoUrl: workspace.logoUrl,
+        about: workspace.about,
+        brandPrimary: workspace.brandPrimary,
+        brandAccent: workspace.brandAccent,
+        bookingPolicy: workspace.bookingPolicy,
+        publicBookingEnabled: workspace.publicBookingEnabled
+      },
+      services,
+      staffMembers
+    };
   });
 
   app.get("/public/b/:slug/slots", async (req) => {
-    const q = z.object({ serviceId: z.string(), staffMemberId: z.string().optional(), date: z.string() }).parse(req.query);
+    const query = z
+      .object({
+        serviceId: z.string(),
+        staffMemberId: z.string().optional(),
+        date: z.string()
+      })
+      .parse(req.query);
     const { slug } = z.object({ slug: z.string() }).parse(req.params);
-    const ws = await prisma.workspace.findUniqueOrThrow({ where: { slug } });
-    const service = await prisma.service.findFirstOrThrow({ where: { id: q.serviceId, workspaceId: ws.id } });
-    const day = new Date(q.date);
-    const staff = q.staffMemberId ? await prisma.staffMember.findUniqueOrThrow({ where: { id: q.staffMemberId } }) : await prisma.staffMember.findFirstOrThrow({ where: { workspaceId: ws.id } });
-    const av = await prisma.staffAvailability.findFirstOrThrow({ where: { staffMemberId: staff.id, weekday: day.getDay() } });
-    const [sh, sm] = av.startTime.split(":").map(Number);
-    const [eh, em] = av.endTime.split(":").map(Number);
-    const start = new Date(day); start.setHours(sh, sm, 0, 0);
-    const end = new Date(day); end.setHours(eh, em, 0, 0);
-    const existing = await prisma.appointment.findMany({ where: { workspaceId: ws.id, staffMemberId: staff.id, startAt: { gte: startOfDay(day), lte: endOfDay(day) }, status: { not: "cancelled" } } });
-    const slots = generateSlots({ startAt: start, endAt: end, durationMinutes: service.durationMinutes, bufferBeforeMinutes: service.bufferBeforeMinutes, bufferAfterMinutes: service.bufferAfterMinutes, existing });
-    return { slots: slots.map((s) => s.toISOString()), staffMemberId: staff.id };
-  });
-
-  app.post("/public/b/:slug/book", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (req) => {
-    const body = z.object({ serviceId: z.string(), staffMemberId: z.string(), startAt: z.string(), name: z.string(), whatsapp: z.string(), email: z.string().email().optional(), whatsappOptIn: z.boolean(), policyAccepted: z.boolean() }).parse(req.body);
-    const { slug } = z.object({ slug: z.string() }).parse(req.params);
-    const ws = await prisma.workspace.findUniqueOrThrow({ where: { slug } });
-    const service = await prisma.service.findUniqueOrThrow({ where: { id: body.serviceId } });
-    const client = await prisma.client.upsert({
-      where: { workspaceId_whatsapp: { workspaceId: ws.id, whatsapp: body.whatsapp } },
-      update: { name: body.name, email: body.email, whatsappOptInAt: body.whatsappOptIn ? new Date() : null, whatsappOptInIp: req.ip, whatsappOptInMethod: "public_form" },
-      create: { workspaceId: ws.id, name: body.name, whatsapp: body.whatsapp, email: body.email, whatsappOptInAt: body.whatsappOptIn ? new Date() : null, whatsappOptInIp: req.ip, whatsappOptInMethod: "public_form" }
+    const workspace = await prisma.workspace.findUniqueOrThrow({ where: { slug } });
+    const result = await listAvailableSlots({
+      workspaceId: workspace.id,
+      serviceId: query.serviceId,
+      staffMemberId: query.staffMemberId,
+      date: new Date(query.date)
     });
 
-    const startAt = new Date(body.startAt);
-    const endAt = addMinutes(startAt, service.durationMinutes);
-    const status = service.depositEnabled && env.MERCADO_PAGO_ENABLED ? "pending_payment" : "confirmed";
-    const appt = await prisma.appointment.create({
-      data: {
-        workspaceId: ws.id,
-        serviceId: service.id,
-        staffMemberId: body.staffMemberId,
-        resourceId: service.requiredResourceId,
-        clientId: client.id,
-        status,
-        startAt,
-        endAt,
-        depositAmount: service.depositEnabled ? (service.depositType === "percent" ? Math.floor((service.priceValue ?? 0) * (service.depositValue ?? 0) / 100) : service.depositValue ?? 0) : null,
-        depositProvider: service.depositEnabled ? "mercado_pago" : null,
-        depositStatus: service.depositEnabled ? "pending" : null,
-        cancelToken: randomUUID()
+    return {
+      staffMemberId: result.staff.id,
+      slots: result.slots.map((slot) => slot.toISOString())
+    };
+  });
+
+  app.post("/public/b/:slug/book", { config: { rateLimit: { max: 25, timeWindow: "1 minute" } } }, async (req) => {
+    const body = z
+      .object({
+        serviceId: z.string(),
+        staffMemberId: z.string(),
+        startAt: z.string(),
+        name: z.string().min(2),
+        whatsapp: z.string().min(8),
+        email: z.string().email().optional(),
+        notesClient: z.string().max(500).optional(),
+        whatsappOptIn: z.boolean(),
+        policyAccepted: z.literal(true)
+      })
+      .parse(req.body);
+    const { slug } = z.object({ slug: z.string() }).parse(req.params);
+    const workspace = await prisma.workspace.findUniqueOrThrow({ where: { slug } });
+    if (!workspace.publicBookingEnabled) {
+      throw app.httpErrors.forbidden("Agendamento publico desabilitado para este negocio.");
+    }
+
+    const requestFingerprint = sha256(JSON.stringify({
+      slug,
+      serviceId: body.serviceId,
+      staffMemberId: body.staffMemberId,
+      startAt: body.startAt,
+      whatsapp: body.whatsapp
+    }));
+    const idempotencyKey = (req.headers["x-idempotency-key"] as string | undefined) ?? `public:${requestFingerprint}`;
+
+    const existing = await prisma.appointment.findUnique({ where: { idempotencyKey } });
+    if (existing) {
+      return { appointmentId: existing.id, status: existing.status, duplicated: true };
+    }
+
+    const client = await prisma.client.upsert({
+      where: {
+        workspaceId_whatsapp: {
+          workspaceId: workspace.id,
+          whatsapp: body.whatsapp
+        }
+      },
+      update: {
+        name: body.name,
+        email: body.email ?? null,
+        whatsappOptInAt: body.whatsappOptIn ? new Date() : null,
+        whatsappOptInIp: req.ip,
+        whatsappOptInMethod: "public_form"
+      },
+      create: {
+        workspaceId: workspace.id,
+        name: body.name,
+        whatsapp: body.whatsapp,
+        email: body.email ?? null,
+        whatsappOptInAt: body.whatsappOptIn ? new Date() : null,
+        whatsappOptInIp: req.ip,
+        whatsappOptInMethod: "public_form"
       }
     });
 
-    if (status === "pending_payment") {
-      const provider = new MercadoPagoProvider();
-      const payment = await provider.createPixCharge({ amount: appt.depositAmount ?? 0, description: `Sinal ${service.name}`, payerName: client.name, payerEmail: client.email ?? undefined });
-      await prisma.payment.create({ data: { appointmentId: appt.id, amount: appt.depositAmount ?? 0, provider: "mercado_pago", status: "pending", externalId: payment.externalId, qrCode: payment.qrCode, pixCopyPaste: payment.pixCopyPaste } });
-      return { appointmentId: appt.id, status, payment };
+    let created;
+    try {
+      created = await createAppointment({
+        workspaceId: workspace.id,
+        serviceId: body.serviceId,
+        staffMemberId: body.staffMemberId,
+        clientId: client.id,
+        startAt: new Date(body.startAt),
+        source: "public",
+        idempotencyKey,
+        notesClient: body.notesClient
+      });
+    } catch (error) {
+      if (error instanceof Error && ["SLOT_NOT_AVAILABLE", "SLOT_CONFLICT"].includes(error.message)) {
+        throw app.httpErrors.conflict("Este horario acabou de ficar indisponivel. Escolha outro.");
+      }
+      if (error instanceof Error && error.message === "OUTSIDE_BOOKING_WINDOW") {
+        throw app.httpErrors.badRequest("Horario fora da janela permitida pelo negocio.");
+      }
+      throw error;
     }
 
-    return { appointmentId: appt.id, status };
+    await rememberIdempotency({
+      scope: "public_booking",
+      key: idempotencyKey,
+      workspaceId: workspace.id,
+      requestHash: requestFingerprint,
+      responseBody: { appointmentId: created.appointment.id, status: created.status },
+      statusCode: 201
+    });
+
+    if (created.status === "pending_payment") {
+      const provider = new MercadoPagoProvider();
+      const payment = await provider.createPixCharge({
+        amount: created.depositAmount ?? 0,
+        description: `Sinal ${workspace.name}`,
+        payerName: client.name,
+        payerEmail: client.email ?? undefined,
+        idempotencyKey
+      });
+
+      await prisma.payment.create({
+        data: {
+          appointmentId: created.appointment.id,
+          amount: created.depositAmount ?? 0,
+          provider: "mercado_pago",
+          status: "pending",
+          externalId: payment.externalId,
+          idempotencyKey,
+          qrCode: payment.qrCode,
+          pixCopyPaste: payment.pixCopyPaste,
+          expiresAt: payment.expiresAt ?? null,
+          providerPayload: payment.rawPayload as never
+        }
+      });
+
+      return {
+        appointmentId: created.appointment.id,
+        status: created.status,
+        payment
+      };
+    }
+
+    return {
+      appointmentId: created.appointment.id,
+      status: created.status,
+      confirmationCode: randomUUID()
+    };
   });
 };

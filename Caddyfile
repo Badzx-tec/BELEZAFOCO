@@ -1,5 +1,36 @@
-belezafoco.com {
-  encode gzip
-  reverse_proxy /api/* 127.0.0.1:3333
-  reverse_proxy 127.0.0.1:4173
+{$CADDY_SITE_ADDRESS::80} {
+  encode zstd gzip
+
+  handle /healthz {
+    respond "ok" 200
+  }
+
+  handle /readyz {
+    respond "ready" 200
+  }
+
+  @assets path /assets/*
+  header @assets Cache-Control "public, max-age=31536000, immutable"
+
+  handle_path /api/* {
+    reverse_proxy {$API_UPSTREAM:api:3333}
+  }
+
+  handle /health {
+    reverse_proxy {$API_UPSTREAM:api:3333}
+  }
+
+  handle /ready {
+    reverse_proxy {$API_UPSTREAM:api:3333}
+  }
+
+  root * /srv
+  try_files {path} /index.html
+  file_server
+
+  header {
+    Referrer-Policy strict-origin-when-cross-origin
+    X-Content-Type-Options nosniff
+    X-Frame-Options SAMEORIGIN
+  }
 }

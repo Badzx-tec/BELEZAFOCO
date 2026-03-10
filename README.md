@@ -1,47 +1,55 @@
 # BELEZAFOCO
 
-SaaS multi-tenant para barbearias, salões, manicure, maquiagem e estética.
+SaaS multi-tenant para barbearias, saloes, nail designers, esteticas e negocios de beleza.
 
-## Stack
-- Backend: Node 20 + TypeScript + Fastify + Prisma + Zod + JWT
+## Stack atual
+
+- Backend: Node 20 + TypeScript + Fastify + Prisma
 - Frontend: React + Vite + Tailwind
-- Banco MVP: SQLite (WAL)
-- Jobs: comandos Node agendados por cron/systemd timer
+- Banco principal: PostgreSQL
+- Suporte operacional: Redis
+- Jobs atuais: scripts Node para reminders, reconciliacao e cleanup
 
-## Funcionalidades implementadas
-- Multi-tenant por Workspace com Membership e papéis
-- Link público `/b/:slug` para agendamento sem conta
-- Serviços com duração, buffers, política de sinal
-- Profissionais, disponibilidade e recursos (cadeira/sala)
-- Scheduler com prevenção de conflito (staff + resource)
-- Agendamento com status e export CSV
-- Waitlist com token de expiração
-- Lembretes 24h/2h com deduplicação e providers (mock WhatsApp/email fallback)
-- Pagamento PIX (Mercado Pago mock + webhook de reconciliação)
-- Billing do SaaS (trial/basic/pro) com enforcement server-side
-- Audit log para ações críticas
-- /health, rate limiting e logs estruturados
+## Estado atual
 
-## Rodando local
+A base atual tem bons sinais de direcao, mas a auditoria de 2026-03-09 concluiu que o produto ainda nao esta pronto para producao real. Os documentos abaixo registram o estado do repositorio, a decisao arquitetural final e o plano de hardening para levar o projeto a um SaaS vendavel.
+
+## Subindo o projeto localmente
+
+1. Copie `.env.example` para `.env`
+2. Suba a infraestrutura:
+
 ```bash
-cp .env.example .env
-pnpm install
-pnpm prisma:generate
-pnpm prisma:migrate
-pnpm seed
-pnpm dev
+docker compose up -d
 ```
 
-API em `http://localhost:3333` e front em `http://localhost:5173`.
+3. Instale dependencias:
 
-## Jobs
 ```bash
-node apps/api/dist/jobs/sendReminders.js
-node apps/api/dist/jobs/reconcilePayments.js
-node apps/api/dist/jobs/cleanup.js
+corepack pnpm install
 ```
 
-## Testes
+4. Gere o Prisma Client:
+
 ```bash
-pnpm --filter @belezafoco/api test
+corepack pnpm --filter @belezafoco/api prisma:generate
 ```
+
+5. Rode build e testes:
+
+```bash
+corepack pnpm -r build
+corepack pnpm -r test
+```
+
+## Documentacao principal
+
+- `docs/01-technical-audit.md`
+- `docs/02-architecture-decisions.md`
+- `docs/03-production-checklist.md`
+- `docs/04-deploy-digitalocean.md`
+- `docs/05-integrations-whatsapp-mercadopago.md`
+- `docs/06-sales-positioning.md`
+- `docs/07-testing-strategy.md`
+- `docs/08-mcp-usage-log.md`
+- `docs/09-deploy-northflank.md`

@@ -9,6 +9,13 @@ export async function writeAudit(input: {
   payload: unknown;
 }) {
   await prisma.auditLog.create({
-    data: { ...input, payload: JSON.stringify(input.payload) }
+    data: {
+      workspaceId: input.workspaceId,
+      actorUserId: input.actorUserId,
+      action: input.action,
+      entityType: input.entityType,
+      entityId: input.entityId,
+      payload: input.payload as never
+    }
   });
 }

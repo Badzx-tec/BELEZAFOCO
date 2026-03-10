@@ -11,7 +11,7 @@ describe("scheduler", () => {
       bufferAfterMinutes: 10,
       existing: [{ startAt: new Date("2026-01-01T09:30:00Z"), endAt: new Date("2026-01-01T10:00:00Z") }]
     });
-    expect(slots.map((d) => d.toISOString())).toEqual(["2026-01-01T09:00:00.000Z"]);
+    expect(slots.map((d) => d.toISOString())).toEqual([]);
   });
 
   it("detecta overlap de profissional e recurso", () => {

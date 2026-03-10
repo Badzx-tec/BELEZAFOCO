@@ -1,0 +1,13 @@
+.git
+.gitignore
+.vscode
+node_modules
+**/node_modules
+**/dist
+coverage
+vite-web.log
+.env
+.env.local
+.env.development
+.env.production
+docker-compose*.override.yml
