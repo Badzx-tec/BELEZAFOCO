@@ -1,6 +1,8 @@
-FROM node:20-alpine AS base
+FROM node:20-bookworm-slim AS base
 WORKDIR /app
-RUN apk add --no-cache openssl
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 RUN corepack enable
 
 FROM base AS deps
@@ -33,7 +35,7 @@ COPY . .
 RUN corepack pnpm --filter @belezafoco/api prisma:generate
 RUN corepack pnpm build
 
-FROM node:20-alpine AS api
+FROM base AS api
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/node_modules ./node_modules
