@@ -24,6 +24,7 @@
 - removed public booking fallbacks from frontend and backend so only real workspace slugs can book
 - updated seed/bootstrap defaults away from placeholder workspace slugs and marked owner seed users as verified
 - allowed Google Identity Services through the production CSP so Google Sign-In can render on the live auth page
+- allowed the Google Identity Services stylesheet through the production CSP so the sign-in button can mount cleanly
 - changed reminder delivery defaults to fail closed in production instead of silently using mock WhatsApp delivery
 - added API Vitest serialization and refreshed Playwright smoke coverage for landing, auth and public booking failure states
 - added `RUN_MIGRATIONS_ON_START` container support as a controlled bridge until the dedicated Northflank migration job is created

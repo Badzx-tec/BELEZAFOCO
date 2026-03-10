@@ -44,7 +44,7 @@ export function buildApp() {
     defaultSrc: ["'self'"],
     baseUri: ["'self'"],
     scriptSrc: ["'self'", "https://accounts.google.com"],
-    styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+    styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com"],
     fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
     imgSrc: ["'self'", "data:", "blob:", "https:"],
     connectSrc: ["'self'", "https://*.ingest.sentry.io", "https://*.sentry.io", "https://accounts.google.com"],
