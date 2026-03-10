@@ -9,7 +9,7 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(10),
   CORS_ORIGIN: z.string().default("*"),
   SUPERADMIN_EMAIL: z.string().email().optional(),
-  WHATSAPP_PROVIDER: z.enum(["mock", "cloud_api", "none"]).default("mock"),
+  WHATSAPP_PROVIDER: z.enum(["mock", "cloud_api", "none"]).default("none"),
   WHATSAPP_CLOUD_API_TOKEN: z.string().optional(),
   WHATSAPP_CLOUD_PHONE_ID: z.string().optional(),
   SMTP_HOST: z.string().optional(),

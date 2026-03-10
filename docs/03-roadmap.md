@@ -2,10 +2,10 @@
 
 ## Status atual
 
-- Auditoria técnica: concluída
-- Decisão arquitetural: concluída
-- Baseline de produção: entregue parcialmente
-- Frontend comercial e booking público: entregues parcialmente
+- Auditoria tecnica: concluida
+- Decisao arquitetural: concluida
+- Baseline de producao: entregue parcialmente
+- Frontend comercial e booking publico: entregues parcialmente
 
 ## Fase 1
 
@@ -14,7 +14,7 @@ Objetivo: tirar o projeto do modo MVP.
 - PostgreSQL como banco principal
 - migrations reais
 - envs e docker atualizados
-- seed de demo utilizável
+- seed operacional utilizavel
 - auth, RBAC e webhook endurecidos
 
 Status atual:
@@ -26,42 +26,42 @@ Status atual:
 
 ## Fase 2
 
-Objetivo: entregar demo comercial forte.
+Objetivo: entregar fluxo comercial e onboarding reais.
 
 - landing page com copy de venda
-- booking público premium
+- booking publico premium
 - identidade visual por workspace
 - onboarding guiado
 
 Status atual:
 
 - landing page refeita
-- dashboard demo com app shell profissional
-- booking público mobile-first conectado à API
+- dashboard operacional com app shell profissional
+- booking publico mobile-first conectado a API
 
 ## Fase 3
 
-Objetivo: operação diária confiável.
+Objetivo: operacao diaria confiavel.
 
 - agenda por profissional
-- exceções, bloqueios e feriados
+- excecoes, bloqueios e feriados
 - conflitos robustos
-- dashboard e relatórios úteis
+- dashboard e relatorios uteis
 
 ## Fase 4
 
-Objetivo: retenção e monetização.
+Objetivo: retencao e monetizacao.
 
 - lembretes mais maduros
 - templates por workspace
 - billing do SaaS completo
-- experiência de trial e upgrade
+- experiencia de trial e upgrade
 
 ## Fase 5
 
-Objetivo: escalar com segurança.
+Objetivo: escalar com seguranca.
 
 - filas e retry mais robustos
 - observabilidade e alertas
-- políticas de backup/restore testadas
-- preparação para multiunidade e integrações adicionais
+- politicas de backup/restore testadas
+- preparacao para multiunidade e integracoes adicionais

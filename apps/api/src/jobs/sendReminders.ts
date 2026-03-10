@@ -1,11 +1,11 @@
 import { addHours, addMinutes, isWithinInterval } from "date-fns";
 import { env } from "../config/env.js";
 import { prisma } from "../lib/prisma.js";
-import { EmailFallbackProvider, MockWhatsAppProvider } from "../modules/messaging/provider.js";
+import { EmailNotificationProvider, buildMessagingProvider } from "../modules/messaging/provider.js";
 
 const now = new Date();
-const provider = new MockWhatsAppProvider();
-const email = new EmailFallbackProvider();
+const provider = buildMessagingProvider();
+const email = new EmailNotificationProvider();
 
 const appointments = await prisma.appointment.findMany({
   where: {
@@ -36,28 +36,35 @@ for (const appointment of appointments) {
     });
     if (exists) continue;
 
-    const response = appointment.client.whatsappOptInAt
-      ? await provider.sendTemplate({
-          to: appointment.client.whatsapp,
-          templateName: window.type,
-          language: "pt_BR",
-          variables: {
-            businessName: appointment.workspace.name,
-            serviceName: appointment.service.name,
-            date: appointment.startAt.toLocaleDateString("pt-BR"),
-            time: appointment.startAt.toLocaleTimeString("pt-BR"),
-            staffName: appointment.staffMember.name,
-            address: appointment.workspace.address ?? "",
-            cancelLink: `${env.PUBLIC_URL}/cancel/${appointment.cancelToken}`,
-            rescheduleLink: `${env.PUBLIC_URL}/reschedule/${appointment.id}`
-          }
-        })
-      : await email.sendTemplate({
-          to: appointment.client.email ?? "",
-          templateName: window.type,
-          language: "pt_BR",
-          variables: {}
-        });
+    const payload = {
+      templateName: window.type,
+      language: "pt_BR",
+      variables: {
+        businessName: appointment.workspace.name,
+        serviceName: appointment.service.name,
+        date: appointment.startAt.toLocaleDateString("pt-BR"),
+        time: appointment.startAt.toLocaleTimeString("pt-BR"),
+        staffName: appointment.staffMember.name,
+        address: appointment.workspace.address ?? "",
+        cancelLink: `${env.PUBLIC_URL}/cancel/${appointment.cancelToken}`,
+        rescheduleLink: `${env.PUBLIC_URL}/reschedule/${appointment.id}`
+      }
+    };
+
+    let response =
+      appointment.client.whatsappOptInAt && appointment.client.whatsapp
+        ? await provider.sendTemplate({
+            to: appointment.client.whatsapp,
+            ...payload
+          })
+        : { status: "failed" as const, provider: "whatsapp_skipped", response: "Cliente sem opt-in de WhatsApp" };
+
+    if (response.status === "failed" && appointment.client.email) {
+      response = await email.sendTemplate({
+        to: appointment.client.email,
+        ...payload
+      });
+    }
 
     await prisma.reminderLog.create({
       data: {

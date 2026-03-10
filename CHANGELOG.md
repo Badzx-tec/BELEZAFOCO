@@ -19,10 +19,12 @@
 - finalized the live Northflank rollout by isolating the app in PostgreSQL schema `belezafoco`, applying Prisma migrations in production and validating the public booking + Pix-style flow on the public domain
 - created production documentation set in `docs/01` through `docs/10`
 - created Linear project, PRD document and backlog issues for the productionization effort
-- replaced demo-only auth with production registration, email verification, password reset and protected dashboard sessions
+- replaced placeholder auth with production registration, email verification, password reset and protected dashboard sessions
 - added backend Google Sign-In verification flow, ready to activate with `GOOGLE_CLIENT_ID`
-- removed public booking demo fallbacks from frontend and backend so only real workspace slugs can book
-- updated seed/bootstrap defaults away from `demo-beleza` and marked owner seed users as verified
+- removed public booking fallbacks from frontend and backend so only real workspace slugs can book
+- updated seed/bootstrap defaults away from placeholder workspace slugs and marked owner seed users as verified
+- allowed Google Identity Services through the production CSP so Google Sign-In can render on the live auth page
+- changed reminder delivery defaults to fail closed in production instead of silently using mock WhatsApp delivery
 - added API Vitest serialization and refreshed Playwright smoke coverage for landing, auth and public booking failure states
 - added `RUN_MIGRATIONS_ON_START` container support as a controlled bridge until the dedicated Northflank migration job is created
 - fixed the Northflank startup migration path by shipping the Prisma CLI in the API runtime image and invoking it through `pnpm --filter @belezafoco/api exec prisma --schema prisma/schema.prisma`
@@ -35,7 +37,7 @@
 - migrado o schema Prisma para PostgreSQL com migration baseline versionada
 - adicionados onboarding/workspace reforcado, calendario com bloqueios e dashboard summary no backend
 - adicionados refresh token persistido, RBAC explicito, webhook idempotente e booking publico com lock transacional
-- atualizado seed para demo comercial com servicos, equipe, agenda, bloqueio e pagamento pendente
+- atualizado seed operacional com servicos, equipe, agenda, bloqueio e pagamento pendente
 - refeitas landing page, dashboard e pagina publica de agendamento com UX premium em pt-BR
 - atualizados `README`, `DEPLOY_DIGITALOCEAN.md`, `docker-compose.yml` e scripts de backup/restore PostgreSQL
 - removido o acoplamento com `@fastify/sensible` para compatibilizar o runtime com Fastify 5

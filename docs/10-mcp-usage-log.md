@@ -31,12 +31,12 @@ Decision influenced:
 - audited landing, dashboard and booking pages
 - validated console cleanliness
 - validated mobile viewport behavior
-- validated the public booking demo flow end to end
+- validated the public booking production flow end to end
 - operated the live Northflank UI to inspect service state, open pod shell, update environment variables and validate the production booking flow on the public domain
 
 Decision influenced:
 
-- fix demo booking crash
+- fix booking crash on invalid public slugs
 - add local visual assets
 - add repository Playwright smoke coverage
 - isolate the app in PostgreSQL schema `belezafoco` after the addon `public` schema was found to be shared

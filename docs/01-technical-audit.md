@@ -4,14 +4,14 @@ Date: 2026-03-10
 
 ## Executive summary
 
-BELEZAFOCO already had a usable SaaS foundation: Fastify, Prisma, PostgreSQL schema, React/Vite, JWT auth, workspace-based tenancy, billing scaffolding, public booking, dashboard modules and demo seed data. The right decision was to preserve that base and harden it for production instead of rewriting the product.
+BELEZAFOCO already had a usable SaaS foundation: Fastify, Prisma, PostgreSQL schema, React/Vite, JWT auth, workspace-based tenancy, billing scaffolding, public booking and dashboard modules. The right decision was to preserve that base and harden it for production instead of rewriting the product.
 
 The highest-value blockers discovered in the current repo were not framework choice. They were operational:
 
 - root workspace scripts depended on `pnpm` being globally available
 - the Docker image only launched the API and used a fragile Alpine single-stage setup
 - the frontend assumed an external API host by default, which made same-origin production harder
-- the public booking page was not demo-safe when the backend was unavailable
+- the public booking page depended on backend availability and did not fail gracefully
 - recursive test execution failed when a package had no test files
 - the repo lacked Northflank-specific deployment documentation and release flow guidance
 
@@ -38,7 +38,7 @@ The highest-value blockers discovered in the current repo were not framework cho
 - The API did not serve the built frontend, so production hosting was fragmented
 - No `/healthz` and `/readyz` endpoints for standard platform health checks
 - Frontend API defaults favored local absolute URLs instead of same-origin deployment
-- Public booking could not act as a resilient sales/demo flow without a live API
+- Public booking could not act as a resilient acquisition flow without a live API
 - Observability scaffolding was missing from code
 - E2E coverage was absent from the repository
 - Several requested MCPs were not available in this environment
@@ -51,7 +51,7 @@ The highest-value blockers discovered in the current repo were not framework cho
 - no health/readiness contract for platform checks
 - no optional Sentry initialization in backend/frontend
 - no repository-level Playwright smoke suite
-- no demo-safe public booking path for portfolio/commercial demos
+- no resilient public booking path for sales and onboarding traffic
 
 ## What was preserved
 
@@ -69,7 +69,7 @@ The highest-value blockers discovered in the current repo were not framework cho
 - API now exposes `/healthz` and `/readyz`
 - API now serves the built frontend so Northflank can run a single combined Node service
 - frontend API client now defaults to same-origin requests
-- public booking gained demo fallback data and a usable Pix-oriented reservation flow without backend availability
+- public booking was hardened to operate only against real workspace data and fail clearly when a slug is invalid
 - local visual assets were added under `apps/web/public/marketing` and `apps/web/public/niches`
 - optional Sentry initialization was added to backend and frontend behind env flags
 - Playwright smoke tests were added and executed successfully
@@ -78,7 +78,7 @@ The highest-value blockers discovered in the current repo were not framework cho
 
 - WhatsApp Cloud API and Mercado Pago providers are still scaffolded more heavily in docs/architecture than in a fully credentialed production implementation
 - Northflank deployment was prepared but not executed from this environment because there is no Northflank MCP or authenticated CLI session here
-- no real PostgreSQL instance was available locally during this session, so API runtime was validated by build/tests and demo-safe frontend fallback rather than a live DB-backed smoke
+- no real PostgreSQL instance was available locally during the first hardening pass, so final runtime validation happened against the Northflank production database
 - formal load testing and webhook replay tests are still pending
 
 ## Phase plan
@@ -90,10 +90,10 @@ The highest-value blockers discovered in the current repo were not framework cho
 - align API/frontend for same-origin combined service
 - publish ADRs and Northflank runbooks
 
-### Phase 2: premium UX and demo readiness
+### Phase 2: premium UX and acquisition readiness
 
 - add local marketing assets and stronger visual sections
-- make booking publicly demonstrable without infra dependencies
+- make booking publicly trustworthy with real data and clear failure states
 - validate landing/dashboard/booking with Playwright
 
 ### Phase 3: production integration hardening
