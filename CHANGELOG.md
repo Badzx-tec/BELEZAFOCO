@@ -14,6 +14,7 @@
 - replaced the mock-only Mercado Pago Pix provider with a real API-backed flow plus official webhook reconciliation
 - tracked `pnpm-lock.yaml` in Git so Northflank Docker builds receive a complete workspace context
 - disabled `index.html` auto-registration in `@fastify/static` to avoid duplicate `HEAD /` conflicts during production boot
+- restricted tenant auth enforcement to `/me` and `/admin` so the Northflank combined service can serve the public SPA, booking flow and static assets without `401`
 - created production documentation set in `docs/01` through `docs/10`
 - created Linear project, PRD document and backlog issues for the productionization effort
 

@@ -6,28 +6,27 @@ export default fp(async (app) => {
   app.decorateRequest("membershipRole", "");
 
   app.addHook("preHandler", async (req, reply) => {
-    const isPublicRoute =
-      req.url.startsWith("/public") ||
-      req.url.startsWith("/auth") ||
-      req.url.startsWith("/health") ||
-      req.url.startsWith("/ready");
+    const isWorkspaceRoute = req.url === "/me" || req.url.startsWith("/me/");
+    const isAdminRoute = req.url === "/admin" || req.url.startsWith("/admin/");
 
-    if (isPublicRoute) return;
+    // The combined Northflank service also serves the SPA and static assets.
+    // Only API namespaces that carry tenant data should require auth here.
+    if (!isWorkspaceRoute && !isAdminRoute) return;
 
     if (!req.headers.authorization) {
-      reply.code(401).send({ message: "Autenticação obrigatória" });
+      reply.code(401).send({ message: "Autenticacao obrigatoria" });
       return;
     }
 
     await app.auth(req as any);
 
-    if (req.url.startsWith("/admin")) return;
+    if (isAdminRoute) return;
 
     const userId = (req.user as any).sub;
     const headerWorkspaceId = req.headers["x-workspace-id"] as string | undefined;
 
     if (!headerWorkspaceId) {
-      reply.code(400).send({ message: "x-workspace-id header obrigatório" });
+      reply.code(400).send({ message: "x-workspace-id header obrigatorio" });
       return;
     }
 
