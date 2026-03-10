@@ -33,6 +33,8 @@ Decision influenced:
 - validated mobile viewport behavior
 - validated the public booking production flow end to end
 - operated the live Northflank UI to inspect service state, open pod shell, update environment variables and validate the production booking flow on the public domain
+- validated the redesigned landing page locally after the premium frontend refactor
+- identified that local preview of the public booking page against the deployed API is blocked by CORS because the preview runs on `http://127.0.0.1:4173`
 
 Decision influenced:
 
@@ -40,6 +42,7 @@ Decision influenced:
 - add local visual assets
 - add repository Playwright smoke coverage
 - isolate the app in PostgreSQL schema `belezafoco` after the addon `public` schema was found to be shared
+- treat same-origin production validation as the authoritative booking UI check instead of cross-origin local preview
 
 ### Sentry MCP
 
@@ -66,6 +69,21 @@ Decision influenced:
 Decision influenced:
 
 - `docs/09-design-system.md` structure and local asset standards
+
+## Local skill usage
+
+### SuperDesign skill
+
+- initialized `.superdesign/init`
+- generated design-system context files from the real React/Tailwind code
+- created reproduction drafts for landing, booking and dashboard
+- iterated premium variants used as visual source of truth for the refactor
+
+Decision influenced:
+
+- landing moved to an editorial premium hero with stronger mockups and pricing hierarchy
+- booking adopted richer service cards, aspirational cover and stronger summary rail
+- dashboard moved toward an operational cockpit visual model
 
 ### Web research
 

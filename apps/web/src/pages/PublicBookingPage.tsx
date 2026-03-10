@@ -2,6 +2,18 @@ import type { CSSProperties, FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Badge, Button, Card, CheckboxField, EmptyState, Field, Input, SectionTag, SkeletonBlock, Textarea } from "../components/ui";
+import {
+  ArrowRightIcon,
+  CalendarIcon,
+  ClockIcon,
+  FloatingBadge,
+  ImageShowcase,
+  PremiumMetricCard,
+  ShieldIcon,
+  SparkIcon,
+  StepRail,
+  WalletIcon
+} from "../components/premium";
 import { api } from "../lib/api";
 import { formatCurrency, formatDateLabel, formatDateTime, formatTime, nextDateKeys } from "../lib/format";
 
@@ -70,6 +82,25 @@ type BookingResponse = {
 const dateOptions = nextDateKeys(7);
 const initialSelectedDate = dateOptions.at(0) ?? new Date().toISOString().slice(0, 10);
 const weekdayLabels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
+
+function categoryImage(category: string) {
+  const normalized = category.toLowerCase();
+  if (normalized.includes("barb")) return "/niches/barbearia-premium.svg";
+  if (normalized.includes("nail") || normalized.includes("mani")) return "/niches/nail-premium.svg";
+  return "/niches/salao-premium.svg";
+}
+
+function staffPlaceholder(name: string) {
+  return name.charCodeAt(0) % 2 === 0
+    ? "/professionals-placeholders/artist-amber.svg"
+    : "/professionals-placeholders/artist-graphite.svg";
+}
+
+function hoursLabel(minutes: number) {
+  if (minutes < 60) return `${minutes} min`;
+  const hours = minutes / 60;
+  return Number.isInteger(hours) ? `${hours}h` : `${hours.toFixed(1).replace(".", ",")}h`;
+}
 
 function summarizeBusinessHours(businessHours: PublicWorkspaceData["businessHours"]) {
   return businessHours
@@ -188,11 +219,17 @@ export function PublicBookingPage() {
   const selectedService = services.find((service) => service.id === selectedServiceId) ?? null;
   const selectedStaffMember = staffMembers.find((staff) => staff.id === selectedStaffId) ?? null;
   const selectedSlotStaff = staffMembers.find((staff) => staff.id === slotItems.find((item) => item.startAt === selectedSlot)?.staffMemberId) ?? null;
+  const selectedProfessional = selectedStaffMember ?? selectedSlotStaff ?? null;
   const stepsCompleted = [Boolean(selectedServiceId), Boolean(selectedSlot), Boolean(name && whatsapp && policyAccepted)].filter(Boolean).length;
   const brandStyle = data
     ? ({
         "--brand-primary": data.workspace.brandPrimaryColor,
         "--brand-accent": data.workspace.brandAccentColor
+      } as CSSProperties)
+    : undefined;
+  const coverStyle = data
+    ? ({
+        background: `linear-gradient(135deg, ${data.workspace.brandPrimaryColor} 0%, ${data.workspace.brandAccentColor} 100%)`
       } as CSSProperties)
     : undefined;
 
@@ -269,58 +306,63 @@ export function PublicBookingPage() {
       <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[1.02fr_0.98fr]">
         <section className="space-y-6">
           <Card className="overflow-hidden px-6 py-6 sm:px-8">
-            <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-start">
+            <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-start">
               <div>
-                <SectionTag>Agendamento online</SectionTag>
-                <h1 className="mt-4 text-balance text-4xl font-semibold text-slate-950">{data.workspace.name}</h1>
-                <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">{data.workspace.description}</p>
+                <SectionTag>Agendamento premium</SectionTag>
+                <h1 className="mt-5 text-balance text-4xl font-semibold text-slate-950 sm:text-5xl">{data.workspace.name}</h1>
+                <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600">
+                  {data.workspace.description ?? "Atendimento profissional com jornada mobile-first e confirmacao clara."}
+                </p>
 
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Badge tone="accent">Resposta rapida por WhatsApp</Badge>
                   <Badge>{data.workspace.timezone}</Badge>
-                  <Badge tone="warning">Antecedencia minima de {data.workspace.minAdvanceMinutes / 60}h</Badge>
+                  <Badge tone="warning">Antecedencia minima de {hoursLabel(data.workspace.minAdvanceMinutes)}</Badge>
                 </div>
               </div>
 
-              <div
-                className="rounded-[30px] px-5 py-5 text-white shadow-[0_20px_40px_-28px_rgba(15,23,42,0.9)]"
-                style={{ backgroundColor: data.workspace.brandPrimaryColor }}
-              >
-                <p className="text-xs uppercase tracking-[0.28em] text-white/70">Atendimento</p>
+              <div className="w-full max-w-[220px] rounded-[30px] px-5 py-5 text-white shadow-[0_24px_60px_-28px_rgba(15,23,42,0.76)]" style={coverStyle}>
+                <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-white/66">Contato direto</p>
                 <p className="mt-3 text-xl font-semibold">{data.workspace.whatsapp ?? "WhatsApp ativo"}</p>
-                <p className="mt-2 max-w-sm text-sm leading-6 text-white/75">{data.workspace.address ?? "Endereco informado no onboarding"}</p>
+                <p className="mt-3 text-sm leading-6 text-white/78">{data.workspace.address ?? "Endereco informado no onboarding"}</p>
               </div>
             </div>
 
-            <div className="mt-6 overflow-hidden rounded-[30px] border border-slate-200/70 bg-[linear-gradient(135deg,rgba(15,23,42,0.98),rgba(30,41,59,0.96))] text-white">
-              <div className="grid gap-5 px-5 py-5 lg:grid-cols-[1.08fr_0.92fr] lg:items-center">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-200/80">Fluxo mobile-first</p>
-                  <h2 className="mt-3 text-2xl font-semibold">Seu cliente sente a qualidade antes do primeiro atendimento.</h2>
-                  <p className="mt-3 max-w-xl text-sm leading-7 text-slate-300">
-                    Escolha de servico, horario, sinal e confirmacao desenhados para reduzir atrito em celular e aumentar a percepcao de valor.
-                  </p>
+            <div className="mt-7 grid gap-5 lg:grid-cols-[1.04fr_0.96fr]">
+              <div className="surface-dark relative overflow-hidden p-5 text-white sm:p-6">
+                <FloatingBadge className="absolute left-4 top-4">
+                  <SparkIcon className="h-3.5 w-3.5 text-amber-300" />
+                  luxury experience
+                </FloatingBadge>
+                <div className="relative mt-10 grid gap-4 lg:grid-cols-[1fr_220px] lg:items-end">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-amber-200/78">Fluxo mobile-first</p>
+                    <h2 className="mt-3 text-2xl font-semibold text-white">Seu cliente sente o valor antes do primeiro atendimento.</h2>
+                    <p className="mt-3 text-sm leading-7 text-white/68">
+                      Escolha de servico, horario, dados e sinal no Pix em uma jornada curta, bonita e confiavel no celular.
+                    </p>
+                  </div>
+                  <img
+                    src="/marketing/mobile-booking-premium.svg"
+                    alt="Mockup premium do agendamento publico"
+                    className="mx-auto w-full max-w-[240px]"
+                  />
                 </div>
-                <img
-                  src="/marketing/booking-cover.svg"
-                  alt="Mockup do fluxo publico de agendamento no celular"
-                  className="mx-auto w-full max-w-[360px]"
-                />
               </div>
-            </div>
 
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-[24px] bg-slate-50/90 px-4 py-4">
-                <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Horarios</p>
-                <p className="mt-2 text-sm font-semibold text-slate-900">{summarizeBusinessHours(data.businessHours)}</p>
-              </div>
-              <div className="rounded-[24px] bg-slate-50/90 px-4 py-4">
-                <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Janela de reserva</p>
-                <p className="mt-2 text-sm font-semibold text-slate-900">Ate {data.workspace.maxAdvanceDays} dias no futuro</p>
-              </div>
-              <div className="rounded-[24px] bg-slate-50/90 px-4 py-4">
-                <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Politica</p>
-                <p className="mt-2 text-sm font-semibold text-slate-900">Cancelamentos com regra definida</p>
+              <div className="grid gap-4">
+                <PremiumMetricCard
+                  label="Horarios"
+                  value="Agenda aberta"
+                  detail={summarizeBusinessHours(data.businessHours)}
+                  icon={<CalendarIcon className="h-5 w-5" />}
+                />
+                <PremiumMetricCard
+                  label="Janela"
+                  value="Reserva protegida"
+                  detail={`Reservas ate ${data.workspace.maxAdvanceDays} dias no futuro.`}
+                  icon={<ShieldIcon className="h-5 w-5" />}
+                />
               </div>
             </div>
           </Card>
@@ -335,7 +377,7 @@ export function PublicBookingPage() {
               <Badge tone="success">{services.length} opcoes ativas</Badge>
             </div>
 
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
               {services.map((service) => {
                 const active = selectedServiceId === service.id;
                 return (
@@ -343,25 +385,32 @@ export function PublicBookingPage() {
                     key={service.id}
                     type="button"
                     onClick={() => setSelectedServiceId(service.id)}
-                    className={`rounded-[30px] border px-5 py-5 text-left transition duration-200 ${
-                      active ? "text-white shadow-[0_24px_54px_-36px_rgba(15,23,42,0.8)]" : "border-slate-200/80 bg-white hover:border-slate-300"
+                    className={`overflow-hidden rounded-[30px] border text-left transition duration-200 ${
+                      active ? "border-transparent text-white shadow-[0_28px_70px_-38px_rgba(15,23,42,0.8)]" : "border-slate-200/80 bg-white hover:border-slate-300"
                     }`}
-                    style={active ? { borderColor: data.workspace.brandPrimaryColor, backgroundColor: data.workspace.brandPrimaryColor } : undefined}
+                    style={active ? { background: `linear-gradient(135deg, ${data.workspace.brandPrimaryColor}, ${data.workspace.brandAccentColor})` } : undefined}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className={`text-xs font-semibold uppercase tracking-[0.22em] ${active ? "text-white/65" : "text-slate-400"}`}>{service.category}</p>
-                        <p className="mt-3 text-xl font-semibold">{service.name}</p>
+                    <div className="grid gap-0 sm:grid-cols-[0.95fr_1.05fr]">
+                      <div className={`p-5 ${active ? "bg-black/18" : "bg-slate-50/80"}`}>
+                        <img src={categoryImage(service.category)} alt={service.category} className="w-full rounded-[24px]" />
                       </div>
-                      {service.featured ? <Badge tone={active ? "warning" : "accent"}>{active ? "Mais pedido" : "Destaque"}</Badge> : null}
-                    </div>
-                    <p className={`mt-3 text-sm leading-7 ${active ? "text-white/78" : "text-slate-500"}`}>{service.description}</p>
-                    <div className={`mt-4 flex flex-wrap gap-2 text-sm ${active ? "text-white/82" : "text-slate-600"}`}>
-                      <span className={`rounded-full px-3 py-2 ${active ? "bg-white/10" : "bg-slate-100"}`}>{service.durationMinutes} min</span>
-                      <span className={`rounded-full px-3 py-2 ${active ? "bg-white/10" : "bg-slate-100"}`}>{formatCurrency(service.priceValue)}</span>
-                      {service.depositEnabled ? (
-                        <span className={`rounded-full px-3 py-2 ${active ? "bg-white/10" : "bg-slate-100"}`}>Sinal {formatCurrency(service.depositAmount)}</span>
-                      ) : null}
+                      <div className="p-5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className={`text-[11px] font-bold uppercase tracking-[0.22em] ${active ? "text-white/66" : "text-slate-400"}`}>{service.category}</p>
+                            <p className="mt-3 text-xl font-semibold">{service.name}</p>
+                          </div>
+                          {service.featured ? <Badge tone={active ? "warning" : "accent"}>{active ? "Mais pedido" : "Destaque"}</Badge> : null}
+                        </div>
+                        <p className={`mt-3 text-sm leading-7 ${active ? "text-white/76" : "text-slate-500"}`}>{service.description}</p>
+                        <div className={`mt-4 flex flex-wrap gap-2 text-sm ${active ? "text-white/84" : "text-slate-700"}`}>
+                          <span className={`rounded-full px-3 py-2 ${active ? "bg-white/12" : "bg-slate-100"}`}>{service.durationMinutes} min</span>
+                          <span className={`rounded-full px-3 py-2 ${active ? "bg-white/12" : "bg-slate-100"}`}>{formatCurrency(service.priceValue)}</span>
+                          {service.depositEnabled ? (
+                            <span className={`rounded-full px-3 py-2 ${active ? "bg-white/12" : "bg-slate-100"}`}>Sinal {formatCurrency(service.depositAmount)}</span>
+                          ) : null}
+                        </div>
+                      </div>
                     </div>
                   </button>
                 );
@@ -379,7 +428,7 @@ export function PublicBookingPage() {
               <Badge>{slotItems.length} horarios encontrados</Badge>
             </div>
 
-            <div className="mt-5 flex flex-wrap gap-3">
+            <div className="mt-6 flex flex-wrap gap-3">
               <button
                 type="button"
                 className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${selectedStaffId === "" ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-700"}`}
@@ -392,19 +441,22 @@ export function PublicBookingPage() {
                   key={staff.id}
                   type="button"
                   onClick={() => setSelectedStaffId(staff.id)}
-                  className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${selectedStaffId === staff.id ? "text-white shadow-[0_20px_30px_-24px_rgba(15,23,42,0.8)]" : "text-slate-700"}`}
-                  style={{ backgroundColor: selectedStaffId === staff.id ? staff.colorHex : "#e2e8f0" }}
+                  className={`flex items-center gap-3 rounded-full border px-3 py-2.5 text-sm font-semibold transition ${
+                    selectedStaffId === staff.id ? "border-transparent text-white shadow-[0_20px_30px_-24px_rgba(15,23,42,0.8)]" : "border-slate-200 bg-white text-slate-700"
+                  }`}
+                  style={selectedStaffId === staff.id ? { backgroundColor: staff.colorHex } : undefined}
                 >
+                  <img src={staffPlaceholder(staff.name)} alt={staff.name} className="h-9 w-9 rounded-full object-cover" />
                   {staff.name}
                 </button>
               ))}
             </div>
 
             {selectedStaffMember?.bio ? (
-              <div className="mt-4 rounded-[24px] bg-slate-50/90 px-4 py-4 text-sm leading-6 text-slate-600">{selectedStaffMember.bio}</div>
+              <div className="mt-4 rounded-[26px] border border-slate-200/75 bg-slate-50/90 px-4 py-4 text-sm leading-7 text-slate-600">{selectedStaffMember.bio}</div>
             ) : null}
 
-            <div className="mt-5 flex gap-3 overflow-x-auto pb-2">
+            <div className="mt-6 flex gap-3 overflow-x-auto pb-2">
               {dateOptions.map((dateKey) => {
                 const active = selectedDate === dateKey;
                 return (
@@ -413,10 +465,10 @@ export function PublicBookingPage() {
                     type="button"
                     onClick={() => setSelectedDate(dateKey)}
                     className={`min-w-[120px] rounded-[24px] px-4 py-4 text-left transition ${
-                      active ? "bg-slate-950 text-white shadow-[0_20px_36px_-26px_rgba(15,23,42,0.8)]" : "bg-slate-100 text-slate-700"
+                      active ? "bg-slate-950 text-white shadow-[0_20px_36px_-26px_rgba(15,23,42,0.8)]" : "border border-slate-200 bg-white text-slate-700"
                     }`}
                   >
-                    <p className="text-xs uppercase tracking-[0.18em] opacity-70">Data</p>
+                    <p className={`text-[10px] font-bold uppercase tracking-[0.2em] ${active ? "text-white/52" : "text-slate-400"}`}>Data</p>
                     <p className="mt-2 text-sm font-semibold">{formatDateLabel(dateKey)}</p>
                   </button>
                 );
@@ -482,36 +534,46 @@ export function PublicBookingPage() {
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-3">
-                {[
+              <StepRail
+                className="mt-1"
+                steps={[
                   { title: "Servico", done: Boolean(selectedServiceId) },
                   { title: "Horario", done: Boolean(selectedSlot) },
-                  { title: "Dados", done: Boolean(name && whatsapp && policyAccepted) }
-                ].map((item) => (
-                  <div key={item.title} className="rounded-[22px] border border-slate-200/70 bg-white/70 px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <span className={`h-2.5 w-2.5 rounded-full ${item.done ? "bg-emerald-500" : "bg-slate-300"}`} />
-                      <p className="text-sm font-semibold text-slate-800">{item.title}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  { title: "Dados", done: Boolean(name && whatsapp && policyAccepted), current: Boolean(selectedSlot) && !result }
+                ]}
+              />
 
               <div className="grid gap-3">
-                <div className="rounded-[24px] bg-slate-50/90 px-4 py-4">
-                  <p className="text-sm font-medium text-slate-500">Servico</p>
+                <div className="rounded-[26px] border border-slate-200/75 bg-slate-50/88 px-4 py-4">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Servico</p>
                   <p className="mt-2 text-xl font-semibold text-slate-950">{selectedService?.name ?? "Selecione um servico"}</p>
                   <p className="mt-2 text-sm text-slate-500">{selectedService ? formatCurrency(selectedService.priceValue) : "Preco exibido apos escolha"}</p>
                 </div>
-                <div className="rounded-[24px] bg-slate-50/90 px-4 py-4">
-                  <p className="text-sm font-medium text-slate-500">Horario</p>
+                <div className="rounded-[26px] border border-slate-200/75 bg-slate-50/88 px-4 py-4">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Horario</p>
                   <p className="mt-2 text-xl font-semibold text-slate-950">{selectedSlot ? formatDateTime(selectedSlot) : "Escolha um horario"}</p>
-                  <p className="mt-2 text-sm text-slate-500">{selectedStaffMember?.name ?? selectedSlotStaff?.name ?? "Profissional definido na selecao do slot"}</p>
+                  <p className="mt-2 text-sm text-slate-500">{selectedProfessional?.name ?? "Profissional definido ao selecionar o slot"}</p>
                 </div>
+                {selectedProfessional ? (
+                  <div className="flex items-center gap-3 rounded-[26px] border border-slate-200/75 bg-white/80 px-4 py-4">
+                    <img src={staffPlaceholder(selectedProfessional.name)} alt={selectedProfessional.name} className="h-14 w-14 rounded-full object-cover" />
+                    <div>
+                      <p className="text-sm font-semibold text-slate-950">{selectedProfessional.name}</p>
+                      <p className="mt-1 text-sm text-slate-500">{selectedProfessional.bio ?? "Profissional disponivel para o servico selecionado."}</p>
+                    </div>
+                  </div>
+                ) : null}
                 {selectedService?.depositEnabled ? (
-                  <div className="rounded-[24px] border border-amber-200 bg-amber-50 px-4 py-4">
-                    <p className="text-sm font-semibold text-amber-800">Este servico aceita sinal via Pix</p>
-                    <p className="mt-2 text-sm text-amber-700">Valor previsto do sinal: {formatCurrency(selectedService.depositAmount)}</p>
+                  <div className="rounded-[26px] border border-amber-200 bg-amber-50 px-4 py-4">
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-amber-600">
+                        <WalletIcon className="h-4.5 w-4.5" />
+                      </span>
+                      <div>
+                        <p className="text-sm font-semibold text-amber-900">Este servico aceita sinal via Pix</p>
+                        <p className="mt-2 text-sm text-amber-800">Valor previsto do sinal: {formatCurrency(selectedService.depositAmount)}</p>
+                      </div>
+                    </div>
                   </div>
                 ) : null}
               </div>
@@ -529,51 +591,50 @@ export function PublicBookingPage() {
               </p>
 
               {result.payment ? (
-                <div className="mt-5 rounded-[28px] border border-slate-200 bg-slate-50 px-5 py-5">
-                  <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="mt-5 rounded-[30px] border border-slate-200 bg-slate-50 px-5 py-5">
+                  <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
                     <div className="flex-1">
-                      <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Pix copia e cola</p>
-                      <p className="mt-2 text-sm leading-7 text-slate-700">{result.payment.pixCopyPaste}</p>
-                      {result.payment.ticketUrl ? (
-                        <a
-                          className="mt-4 inline-flex text-sm font-semibold text-[var(--accent)]"
-                          href={result.payment.ticketUrl}
-                          rel="noreferrer"
-                          target="_blank"
-                        >
-                          Abrir comprovante/QR em nova aba
-                        </a>
-                      ) : null}
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-950 text-white">
+                          <ShieldIcon className="h-4.5 w-4.5" />
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Pix copia e cola</p>
+                          <p className="mt-1 text-sm leading-7 text-slate-700">{result.payment.pixCopyPaste}</p>
+                        </div>
+                      </div>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <Button variant="secondary" size="sm" onClick={copyPixCode}>
+                          {copiedPix ? "Codigo copiado" : "Copiar codigo"}
+                        </Button>
+                        {result.payment.ticketUrl ? (
+                          <a href={result.payment.ticketUrl} rel="noreferrer" target="_blank">
+                            <Button variant="soft" size="sm">
+                              Abrir QR em nova aba
+                            </Button>
+                          </a>
+                        ) : null}
+                      </div>
+                      <p className="mt-4 text-xs text-slate-500">ID do pagamento: {result.payment.externalId}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Expira em {result.payment.expiresAt ? formatDateTime(result.payment.expiresAt) : "breve"}.
+                      </p>
                     </div>
                     {result.payment.qrCode ? (
                       <div className="rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm">
-                        <img
-                          alt="QR Code Pix do sinal"
-                          className="h-36 w-36 rounded-[18px] object-contain"
-                          src={result.payment.qrCode}
-                        />
+                        <img alt="QR Code Pix do sinal" className="h-36 w-36 rounded-[18px] object-contain" src={result.payment.qrCode} />
                       </div>
                     ) : null}
-                    <div className="sm:self-start">
-                      <Button variant="secondary" size="sm" onClick={copyPixCode}>
-                        {copiedPix ? "Codigo copiado" : "Copiar codigo"}
-                      </Button>
-                    </div>
                   </div>
-                  <p className="mt-4 text-xs text-slate-500">
-                    ID do pagamento: {result.payment.externalId}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Expira em {result.payment.expiresAt ? formatDateTime(result.payment.expiresAt) : "breve"}.
-                  </p>
                 </div>
               ) : null}
             </Card>
           ) : (
             <Card className="px-6 py-6 sm:px-8">
               <SectionTag>Etapa 3</SectionTag>
+              <h2 className="mt-4 text-2xl font-semibold text-slate-950">Confirme seus dados</h2>
               <form className="mt-5 space-y-4" onSubmit={onSubmit}>
-                <Field label="Nome" hint="Obrigatorio">
+                <Field label="Nome completo" hint="Obrigatorio">
                   <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Como devemos te chamar?" required />
                 </Field>
 
@@ -608,7 +669,7 @@ export function PublicBookingPage() {
 
                 <Button
                   type="submit"
-                  className="w-full"
+                  className="w-full gap-2"
                   busy={submitting}
                   disabled={
                     submitting ||
@@ -621,6 +682,7 @@ export function PublicBookingPage() {
                   }
                 >
                   {submitting ? "Confirmando..." : "Confirmar agendamento"}
+                  {!submitting ? <ArrowRightIcon className="h-4 w-4" /> : null}
                 </Button>
 
                 <p className="text-center text-xs leading-6 text-slate-400">
@@ -629,6 +691,19 @@ export function PublicBookingPage() {
               </form>
             </Card>
           )}
+
+          <ImageShowcase
+            image="/marketing/dashboard-spotlight.svg"
+            alt="Painel premium e jornada do booking"
+            className="min-h-[240px]"
+            label="Experiencia premium"
+            overlay={
+              <FloatingBadge className="absolute left-4 top-16" style={{ backgroundColor: `${data.workspace.brandPrimaryColor}CC` }}>
+                <ClockIcon className="h-3.5 w-3.5" />
+                confirmacao mais rapida
+              </FloatingBadge>
+            }
+          />
         </section>
       </div>
     </div>
