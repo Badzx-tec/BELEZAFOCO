@@ -26,6 +26,7 @@
 - added API Vitest serialization and refreshed Playwright smoke coverage for landing, auth and public booking failure states
 - added `RUN_MIGRATIONS_ON_START` container support as a controlled bridge until the dedicated Northflank migration job is created
 - fixed the Northflank startup migration path by shipping the Prisma CLI in the API runtime image and invoking it through `pnpm --filter @belezafoco/api exec prisma --schema prisma/schema.prisma`
+- fixed production SPA deep links for `/auth`, `/auth/verify-email` and `/auth/reset-password` so direct access works behind the combined Fastify service
 
 ## 2026-03-09
 

@@ -150,6 +150,9 @@ export function buildApp() {
     };
 
     app.get("/", spaEntry);
+    app.get("/auth", spaEntry);
+    app.get("/auth/verify-email", spaEntry);
+    app.get("/auth/reset-password", spaEntry);
     app.get("/app", spaEntry);
     app.get("/app/*", spaEntry);
     app.get("/b/*", spaEntry);
