@@ -15,7 +15,7 @@ export async function writeAudit(input: {
       action: input.action,
       entityType: input.entityType,
       entityId: input.entityId,
-      payload: input.payload as never
+      payload: typeof input.payload === "string" ? input.payload : JSON.stringify(input.payload)
     }
   });
 }

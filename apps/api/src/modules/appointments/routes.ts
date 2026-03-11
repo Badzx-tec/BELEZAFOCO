@@ -3,6 +3,7 @@ import { prisma } from "../../lib/prisma.js";
 import { z } from "zod";
 import { writeAudit } from "../../lib/audit.js";
 import { requireRole } from "../../lib/permissions.js";
+import { syncAppointmentFinancialEntry } from "../finance/service.js";
 
 const activeStatuses = ["requested", "pending_payment", "confirmed", "done", "no_show", "late_cancel"] as const;
 
@@ -49,14 +50,19 @@ export const appointmentRoutes: FastifyPluginAsync = async (app) => {
       })
       .parse(req.body);
 
-    const appointment = await prisma.appointment.update({
-      where: { id: params.id, workspaceId: req.workspaceId },
-      data: {
-        status: body.status,
-        internalNotes: body.internalNotes,
-        confirmedAt: body.status === "confirmed" ? new Date() : undefined,
-        cancelledAt: body.status === "cancelled" || body.status === "late_cancel" ? new Date() : undefined
-      }
+    const appointment = await prisma.$transaction(async (tx) => {
+      const updated = await tx.appointment.update({
+        where: { id: params.id, workspaceId: req.workspaceId },
+        data: {
+          status: body.status,
+          internalNotes: body.internalNotes,
+          confirmedAt: body.status === "confirmed" ? new Date() : undefined,
+          cancelledAt: body.status === "cancelled" || body.status === "late_cancel" ? new Date() : undefined
+        }
+      });
+
+      await syncAppointmentFinancialEntry(tx, updated.id);
+      return updated;
     });
 
     await writeAudit({

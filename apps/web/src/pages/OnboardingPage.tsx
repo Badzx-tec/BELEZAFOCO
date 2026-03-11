@@ -262,7 +262,7 @@ export function OnboardingPage() {
     <AppShell
       activeSection="setup"
       title={activeWorkspace ? `Configurar estudio de ${activeWorkspace.name}` : "Configurar estudio"}
-      subtitle="Perfil, equipe, servicos e horarios ligados ao backend real do workspace."
+      subtitle="Perfil, equipe, servicos e horarios organizados em uma jornada de implantacao clara."
       workspaceName={activeWorkspace?.name ?? "Workspace"}
       workspaceSlug={activeWorkspace?.slug}
       userName={user?.name}
@@ -369,7 +369,7 @@ export function OnboardingPage() {
                 {services.length ? services.map((service) => (
                   <div key={service.id} className="rounded-[20px] border border-slate-200 bg-white/80 px-4 py-4">
                     <div className="flex items-center justify-between gap-3">
-                      <div><p className="font-semibold text-slate-950">{service.name}</p><p className="mt-1 text-sm text-slate-500">{service.category} • {service.durationMinutes} min</p></div>
+                      <div><p className="font-semibold text-slate-950">{service.name}</p><p className="mt-1 text-sm text-slate-500">{service.category} | {service.durationMinutes} min</p></div>
                       <Badge tone={service.featured ? "accent" : "neutral"}>{formatCurrency(service.priceValue)}</Badge>
                     </div>
                   </div>
@@ -408,7 +408,7 @@ export function OnboardingPage() {
                       <Badge tone="accent">{item.commissionPercent}%</Badge>
                     </div>
                   </div>
-                )) : <EmptyState title="Equipe vazia" description="Cadastre pelo menos um profissional para começar a operar." />}
+                )) : <EmptyState title="Equipe vazia" description="Cadastre pelo menos um profissional para comecar a operar." />}
               </div>
               <form className="mt-6 grid gap-4" onSubmit={addStaff}>
                 <Field label="Nome do profissional"><Input value={staffForm.name} onChange={(event) => setStaffForm((current) => ({ ...current, name: event.target.value }))} /></Field>

@@ -65,6 +65,10 @@ async function main() {
   });
 
   await prisma.calendarBlock.deleteMany({ where: { workspaceId: workspace.id } });
+  await prisma.cashClosure.deleteMany({ where: { workspaceId: workspace.id } });
+  await prisma.financialEntry.deleteMany({ where: { workspaceId: workspace.id } });
+  await prisma.costCenter.deleteMany({ where: { workspaceId: workspace.id } });
+  await prisma.financialCategory.deleteMany({ where: { workspaceId: workspace.id } });
   await prisma.appointment.deleteMany({ where: { workspaceId: workspace.id } });
   await prisma.waitlistEntry.deleteMany({ where: { workspaceId: workspace.id } });
   await prisma.messageTemplate.deleteMany({ where: { workspaceId: workspace.id } });
@@ -310,6 +314,23 @@ async function main() {
   const today = new Date();
   const tomorrow = addDays(today, 1);
 
+  await prisma.financialCategory.createMany({
+    data: [
+      { workspaceId: workspace.id, name: "Agenda e procedimentos", direction: "inflow", colorHex: "#c26b36" },
+      { workspaceId: workspace.id, name: "Receitas avulsas", direction: "inflow", colorHex: "#f59e0b" },
+      { workspaceId: workspace.id, name: "Operacao e insumos", direction: "outflow", colorHex: "#475569" },
+      { workspaceId: workspace.id, name: "Equipe e comissoes", direction: "outflow", colorHex: "#8b5cf6" }
+    ]
+  });
+
+  await prisma.costCenter.createMany({
+    data: [
+      { workspaceId: workspace.id, name: "Operacao" },
+      { workspaceId: workspace.id, name: "Equipe" },
+      { workspaceId: workspace.id, name: "Marketing" }
+    ]
+  });
+
   await prisma.calendarBlock.create({
     data: {
       workspaceId: workspace.id,
@@ -385,6 +406,117 @@ async function main() {
       pixCopyPaste: "0002012636SEEDPIX",
       expiresAt: addHours(new Date(), 2),
       idempotencyKey: pendingAppointment.id
+    }
+  });
+
+  const [agendaCategory, avulsaCategory, operationCategory, equipeCategory, operationCenter, teamCenter, confirmedAppointment] = await Promise.all([
+    prisma.financialCategory.findFirstOrThrow({ where: { workspaceId: workspace.id, name: "Agenda e procedimentos", direction: "inflow" } }),
+    prisma.financialCategory.findFirstOrThrow({ where: { workspaceId: workspace.id, name: "Receitas avulsas", direction: "inflow" } }),
+    prisma.financialCategory.findFirstOrThrow({ where: { workspaceId: workspace.id, name: "Operacao e insumos", direction: "outflow" } }),
+    prisma.financialCategory.findFirstOrThrow({ where: { workspaceId: workspace.id, name: "Equipe e comissoes", direction: "outflow" } }),
+    prisma.costCenter.findFirstOrThrow({ where: { workspaceId: workspace.id, name: "Operacao" } }),
+    prisma.costCenter.findFirstOrThrow({ where: { workspaceId: workspace.id, name: "Equipe" } }),
+    prisma.appointment.findFirstOrThrow({
+      where: {
+        workspaceId: workspace.id,
+        status: "confirmed",
+        clientId: clientePedro.id
+      }
+    })
+  ]);
+
+  await prisma.financialEntry.createMany({
+    data: [
+      {
+        workspaceId: workspace.id,
+        categoryId: agendaCategory.id,
+        costCenterId: operationCenter.id,
+        appointmentId: confirmedAppointment.id,
+        staffMemberId: joao.id,
+        createdByUserId: user.id,
+        entryKey: `seed:appointment:${confirmedAppointment.id}:receivable`,
+        title: "Corte Premium · Pedro Gomes",
+        direction: "inflow",
+        kind: "appointment_receivable",
+        status: "paid",
+        amountCents: 5500,
+        dueDate: confirmedAppointment.startAt,
+        occurredAt: confirmedAppointment.createdAt,
+        paidAt: confirmedAppointment.confirmedAt ?? new Date()
+      },
+      {
+        workspaceId: workspace.id,
+        categoryId: agendaCategory.id,
+        costCenterId: operationCenter.id,
+        appointmentId: pendingAppointment.id,
+        staffMemberId: camila.id,
+        createdByUserId: user.id,
+        entryKey: `seed:appointment:${pendingAppointment.id}:receivable`,
+        title: "Manicure em Gel · Ana Paula",
+        direction: "inflow",
+        kind: "appointment_receivable",
+        status: "pending",
+        amountCents: 2000,
+        dueDate: pendingAppointment.startAt,
+        occurredAt: pendingAppointment.createdAt
+      },
+      {
+        workspaceId: workspace.id,
+        categoryId: operationCategory.id,
+        costCenterId: operationCenter.id,
+        createdByUserId: user.id,
+        entryKey: `seed:expense:${workspace.id}:insumos`,
+        title: "Reposicao de insumos da semana",
+        description: "Luvas, esterilizacao, produtos de finalizacao e itens de bancada.",
+        direction: "outflow",
+        kind: "manual_expense",
+        status: "paid",
+        amountCents: 1850,
+        occurredAt: atHour(today, 9, 15),
+        paidAt: atHour(today, 9, 20)
+      },
+      {
+        workspaceId: workspace.id,
+        categoryId: equipeCategory.id,
+        costCenterId: teamCenter.id,
+        staffMemberId: joao.id,
+        createdByUserId: user.id,
+        entryKey: `seed:commission:${workspace.id}:joao`,
+        title: "Comissao projetada · Joao Silva",
+        direction: "outflow",
+        kind: "commission",
+        status: "pending",
+        amountCents: 2200,
+        occurredAt: atHour(today, 18, 0)
+      },
+      {
+        workspaceId: workspace.id,
+        categoryId: avulsaCategory.id,
+        costCenterId: operationCenter.id,
+        createdByUserId: user.id,
+        entryKey: `seed:avulso:${workspace.id}:giftcard`,
+        title: "Voucher presente premium",
+        direction: "inflow",
+        kind: "manual_receivable",
+        status: "paid",
+        amountCents: 9000,
+        occurredAt: atHour(today, 11, 10),
+        paidAt: atHour(today, 11, 10)
+      }
+    ]
+  });
+
+  await prisma.cashClosure.create({
+    data: {
+      workspaceId: workspace.id,
+      closedByUserId: user.id,
+      openedAt: atHour(today, 8, 0),
+      closedAt: atHour(today, 19, 0),
+      inflowCents: 14500,
+      outflowCents: 1850,
+      expectedBalanceCents: 12650,
+      actualBalanceCents: 12650,
+      notes: "Fechamento seed para demo comercial com Pix pendente e caixa do dia."
     }
   });
 }

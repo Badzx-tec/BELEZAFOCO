@@ -13,6 +13,8 @@ import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { VerifyEmailPage } from "./pages/VerifyEmailPage";
 import { OnboardingPage } from "./pages/OnboardingPage";
 import { BillingPage } from "./pages/BillingPage";
+import { AgendaPage } from "./pages/AgendaPage";
+import { FinancePage } from "./pages/FinancePage";
 
 if (import.meta.env.VITE_SENTRY_DSN) {
   Sentry.init({
@@ -47,6 +49,22 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             element={
               <ProtectedRoute>
                 <OnboardingPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/app/agenda"
+            element={
+              <ProtectedRoute>
+                <AgendaPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/app/financeiro"
+            element={
+              <ProtectedRoute>
+                <FinancePage />
               </ProtectedRoute>
             }
           />

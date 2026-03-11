@@ -621,7 +621,7 @@ export function AuthPage() {
                 <div>
                   <p className="text-sm font-semibold text-slate-950">Tudo em uma pagina limpa</p>
                   <p className="mt-1 text-sm leading-7 text-slate-500">
-                    Login, registro e recuperacao sem texto tecnico, sem distrações e com o link publico do negocio ja pronto para conferência.
+                    Login, registro e recuperacao sem texto tecnico, sem distracoes e com o link publico do negocio pronto para revisao.
                   </p>
                 </div>
               </div>

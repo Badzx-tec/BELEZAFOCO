@@ -4,77 +4,45 @@
 
 `apps/web/src/main.tsx`
 
-```tsx
-import React from "react";
-import ReactDOM from "react-dom/client";
-import * as Sentry from "@sentry/react";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
-import "./index.css";
-import { ProtectedRoute } from "./components/ProtectedRoute";
-import { AuthProvider } from "./lib/auth";
-import { AuthPage } from "./pages/AuthPage";
-import { LandingPage } from "./pages/LandingPage";
-import { DashboardPage } from "./pages/DashboardPage";
-import { PublicBookingPage } from "./pages/PublicBookingPage";
-import { ResetPasswordPage } from "./pages/ResetPasswordPage";
-import { VerifyEmailPage } from "./pages/VerifyEmailPage";
-
-if (import.meta.env.VITE_SENTRY_DSN) {
-  Sentry.init({
-    dsn: import.meta.env.VITE_SENTRY_DSN,
-    environment: import.meta.env.VITE_SENTRY_ENVIRONMENT ?? "development",
-    release: import.meta.env.VITE_SENTRY_RELEASE,
-    tracesSampleRate: Number(import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE ?? 0.1),
-    integrations: [Sentry.browserTracingIntegration()],
-    tracePropagationTargets: ["localhost", "127.0.0.1", /^\//]
-  });
-}
-
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/auth" element={<AuthPage />} />
-          <Route path="/auth/verify-email" element={<VerifyEmailPage />} />
-          <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
-          <Route
-            path="/app"
-            element={
-              <ProtectedRoute>
-                <DashboardPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/b/:slug" element={<PublicBookingPage />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
-  </React.StrictMode>
-);
-```
-
 ## Routes
 
 - `/`
   - Component: `apps/web/src/pages/LandingPage.tsx`
-  - Layout: standalone marketing page
-  - Summary: hero, product proof, niche cards, pricing and CTA.
+  - Source of truth: Superdesign draft `d426420e-4718-4a65-9df9-c2c9e7839fc7`
+  - Notes: marketing homepage with editorial hero, niche cards, pricing and CTA.
 - `/auth`
   - Component: `apps/web/src/pages/AuthPage.tsx`
-  - Layout: standalone authentication shell
+  - Source of truth: Superdesign draft `49d3669c-c107-4583-9ac4-517da6622bd6`
+  - Notes: clean auth shell for email login, email register, password reset and Google OAuth.
 - `/auth/verify-email`
   - Component: `apps/web/src/pages/VerifyEmailPage.tsx`
-  - Layout: standalone verification state
+  - Source of truth: follows auth shell system
+  - Notes: consumes email verification token and redirects to `/app/setup`.
 - `/auth/reset-password`
   - Component: `apps/web/src/pages/ResetPasswordPage.tsx`
-  - Layout: standalone reset flow
+  - Source of truth: follows auth shell system
+  - Notes: reset password flow without backend implementation copy.
 - `/app`
   - Component: `apps/web/src/pages/DashboardPage.tsx`
-  - Layout: `ProtectedRoute` + `AppShell`
-  - Summary: authenticated operational dashboard with KPIs, upcoming appointments and rankings.
+  - Source of truth: Superdesign draft `9c9f5040-174f-4863-88e8-b3d359ffc128`
+  - Notes: cockpit with KPIs, funnel, upcoming appointments and rankings.
+- `/app/setup`
+  - Component: `apps/web/src/pages/OnboardingPage.tsx`
+  - Source of truth: Superdesign draft `67110d19-1731-4641-8824-e41e3f6ea62d`
+  - Notes: workspace identity, services, staff and business hours.
+- `/app/agenda`
+  - Component: `apps/web/src/pages/AgendaPage.tsx`
+  - Source of truth: derived from dashboard system and Superdesign cockpit language
+  - Notes: daily operations, receptionist filters, status updates and CSV export.
+- `/app/financeiro`
+  - Component: `apps/web/src/pages/FinancePage.tsx`
+  - Source of truth: derived from dashboard system and Superdesign cockpit language
+  - Notes: financial ledger, category breakdown, manual entries, commissions and cash closure.
+- `/app/billing`
+  - Component: `apps/web/src/pages/BillingPage.tsx`
+  - Source of truth: Superdesign draft `a7d7bf35-a2f2-426c-848d-d7c89e076ed2`
+  - Notes: founder plans, usage limits and audited upgrade request.
 - `/b/:slug`
   - Component: `apps/web/src/pages/PublicBookingPage.tsx`
-  - Layout: standalone public booking journey
-  - Summary: branded booking flow with service selection, slots, customer details and Pix summary.
+  - Source of truth: Superdesign draft `52e60a34-38fe-44e1-a76b-d2912f1988f8`
+  - Notes: branded public booking journey with service, staff, slot, customer data and Pix summary.

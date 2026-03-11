@@ -7,6 +7,7 @@ import { enforcePlan } from "../../lib/plan.js";
 import { generateSlots, intersectWindows, type AppointmentIntervalInput } from "../../lib/scheduler.js";
 import { endOfZonedDay, startOfZonedDay, zonedDateKey, zonedDateTime, zonedWeekday } from "../../lib/timezone.js";
 import { MercadoPagoProvider } from "../payments/provider.js";
+import { syncAppointmentFinancialEntry } from "../finance/service.js";
 
 type DbClient = Prisma.TransactionClient | typeof prisma;
 
@@ -538,6 +539,8 @@ export async function createPublicBooking(input: {
         }
       });
     }
+
+    await syncAppointmentFinancialEntry(tx, appointment.id);
 
     await Promise.all([
       tx.workspaceSubscription.update({

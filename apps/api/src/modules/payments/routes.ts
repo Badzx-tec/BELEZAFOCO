@@ -4,6 +4,7 @@ import { env } from "../../config/env.js";
 import { prisma } from "../../lib/prisma.js";
 import { MercadoPagoProvider, type NormalizedPaymentStatus } from "./provider.js";
 import { verifyMercadoPagoWebhookSignature, verifySharedWebhookSecret } from "./webhook-security.js";
+import { syncAppointmentFinancialEntry } from "../finance/service.js";
 
 function normalizeIncomingStatus(status?: string | null): NormalizedPaymentStatus {
   switch (status) {
@@ -192,6 +193,8 @@ export const paymentRoutes: FastifyPluginAsync = async (app) => {
           }
         });
       }
+
+      await syncAppointmentFinancialEntry(tx, payment.appointmentId);
 
       await tx.webhookEvent.update({
         where: { provider_eventId: { provider: "mercado_pago", eventId } },

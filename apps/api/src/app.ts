@@ -22,6 +22,7 @@ import { paymentRoutes } from "./modules/payments/routes.js";
 import { billingRoutes } from "./modules/billing/routes.js";
 import { clientRoutes } from "./modules/clients/routes.js";
 import { dashboardRoutes } from "./modules/dashboard/routes.js";
+import { financeRoutes } from "./modules/finance/routes.js";
 import { messagingRoutes } from "./modules/messaging/routes.js";
 import { env } from "./config/env.js";
 import { prisma } from "./lib/prisma.js";
@@ -101,14 +102,14 @@ export function buildApp() {
 
     if (error instanceof ZodError) {
       reply.code(400).send({
-        message: "Dados inválidos",
+        message: "Dados invalidos",
         issues: error.flatten()
       });
       return;
     }
 
     if ((error as any).statusCode) {
-      reply.code((error as any).statusCode).send({ message: error instanceof Error ? error.message : "Erro na requisição" });
+      reply.code((error as any).statusCode).send({ message: error instanceof Error ? error.message : "Erro na requisicao" });
       return;
     }
 
@@ -140,6 +141,7 @@ export function buildApp() {
   app.register(billingRoutes);
   app.register(clientRoutes);
   app.register(dashboardRoutes);
+  app.register(financeRoutes);
 
   if (webDist) {
     app.register(fastifyStatic, {

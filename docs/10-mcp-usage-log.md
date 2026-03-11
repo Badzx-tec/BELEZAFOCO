@@ -2,124 +2,114 @@
 
 Date base: 2026-03-11
 
-## GitHub MCP
+## find-skills
 
-- phase: repository audit and remote alignment
-- usage: read the remote repository tree and branch inventory for `Badzx-tec/BELEZAFOCO`
-- impact: confirmed the live repo shape and the presence of Northflank-related branches before making runtime decisions
+- phase: capability discovery
+- usage: reviewed the local skill instructions and confirmed the relevant skill inventory for design, deployment, docs and security-adjacent work
+- impact: validated that `superdesign` and `find-skills` were the right local skills to anchor this wave
 
-## Prisma Local MCP
+## superdesign
 
-- phase: data/runtime audit
-- usage: `migrate-status` against `apps/api`
-- impact: surfaced the Prisma CLI 7.4.2 incompatibility with datasource `url` / `directUrl`
-- decision influenced: documented Prisma 7 upgrade as a planned path instead of an unreviewed hot migration
+- phase: frontend source-of-truth alignment
+- usage:
+  - read the local Superdesign skill instructions
+  - inspected the active project drafts
+  - pulled approved HTML for landing and cockpit drafts
+- impact:
+  - locked the route-to-draft mapping
+  - drove the decision to derive `/app/agenda` and `/app/financeiro` from the cockpit system instead of inventing a new visual language
 
-## Context7
+## github
 
-- phase: sensitive architecture decisions
-- usage: queried Prisma docs for Prisma 7 datasource config, `prisma.config.ts` and direct connection guidance
-- impact: confirmed the runtime/migration split and the upgrade implications before touching deployment docs
+- phase: repository audit
+- usage: audited the repo structure and remote branch context
+- impact: confirmed monorepo boundaries, deploy branches and current app topology before deeper changes
 
-## Web research
+## prisma-local
 
-- phase: deployment and integration research
-- usage: official searches for Northflank combined services/jobs, Mercado Pago webhook validation, and WhatsApp Cloud API references
-- impact: reinforced the Northflank combined-service model and the webhook security expectations captured in the docs
+- phase: schema/runtime audit
+- usage: attempted migration status against `apps/api`
+- impact:
+  - surfaced Prisma CLI 7 datasource friction
+  - reinforced the decision to preserve the stable runtime line and document the upgrade path separately
 
-## Chrome DevTools
+## context7
 
-- phase: production validation
-- usage: opened the published `/auth` page and captured console + network state
-- impact: found the live Google Sign-In origin mismatch and the missing `id` / `name` warning on form fields
+- phase: sensitive integration validation
+- usage:
+  - verified Google token validation guidance
+  - verified Prisma datasource / config direction for newer CLI generations
+- impact:
+  - supported the current Google server-side validation model
+  - supported the “runtime stability first” Prisma decision
 
-## Playwright
+## chrome-devtools
 
-- phase: production validation
-- usage: navigated to the same live auth page and reproduced the auth errors in a second browser automation stack
-- impact: confirmed the bug was real and user-facing, not a DevTools-only artifact
+- phase: live production validation
+- usage: opened the published auth flow, checked console and network, and verified that the remaining Google error is external origin authorization
+- impact: prevented a false backend rollback and kept the fix focused on platform configuration
 
-## shadcn MCP
+## playwright
 
-- phase: design-system direction
-- usage: inspected registry availability and searched/viewed `sidebar`, `calendar`, `chart`, `table`, plus the `dashboard-01` example
-- impact: provided concrete UI primitives and dashboard composition references for future premium backoffice work
+- phase: visual and flow validation
+- usage:
+  - validated the published auth flow independently from DevTools
+  - navigated the Superdesign share flow to confirm route hierarchy and composition intent
+- impact: confirmed that the public auth and cockpit mapping matched the intended product journey
 
-## Figma MCP
+## shadcn
 
-- phase: product/flow visualization
-- usage: generated an editable FigJam flow for the onboarding -> booking -> Pix -> reminders -> dashboard path
-- impact: created a reusable artifact for rollout alignment and design communication
-- artifact: `BELEZAFOCO Production Flow`
+- phase: design-system support
+- usage: checked configured registries and validated the presence of the local shadcn registry path
+- impact: confirmed that the local component strategy can stay wrapper-first, with shadcn as composition support rather than visual authority
 
-## Superdesign skill
+## testsprite
 
-- phase: visual direction setup
-- usage: read `.superdesign/init/*`, verified CLI, fetched the live skill instructions and created project `BELEZAFOCO Premium Auth`
-- impact: established a real Superdesign project for premium UI work
-- rejected step: draft generation was blocked by insufficient team credits, so implementation continued with local code + Figma + shadcn guidance
+- phase: quality planning
+- usage: checked account status and credit tier
+- impact:
+  - confirmed Free-plan limits
+  - documented that TestSprite is being used for risk/capacity awareness, not as the only quality gate in this wave
 
-## Superdesign remote project reuse
+## figma
 
-- phase: frontend migration alignment
-- usage: fetched all draft nodes for project `67a89ce9-de34-4eb1-98df-63ba98f2fb8b` and read the HTML for the landing, auth, dashboard, booking and billing drafts
-- impact: locked the approved remote frontend as the visual source of truth for `apps/web`
-- deliverable: `docs/17-superdesign-frontend-map.md` with exact draft-to-route mapping
+- phase: visual hierarchy support
+- usage:
+  - checked authenticated status
+  - generated design-system rules guidance
+- impact: reinforced the spacing, hierarchy and component-consistency pass applied to the shell and cockpit derivatives
 
-## Superdesign remote sync follow-up
-
-- phase: auth/onboarding/billing implementation
-- usage: fetched the live draft HTML for `49d3669c-c107-4583-9ac4-517da6622bd6`, `67110d19-1731-4641-8824-e41e3f6ea62d` and `a7d7bf35-a2f2-426c-848d-d7c89e076ed2`
-- impact: drove the final local implementation of the clean auth shell, the new `/app/setup` onboarding route and the new `/app/billing` subscription route
-- decision influenced: kept the editorial split layout from Superdesign while replacing unsupported fake checkout fields with real workspace-backed upgrade requests
-
-## find-skills skill
-
-- phase: skill discovery
-- usage: reviewed the local skill instructions and attempted `npx skills find northflank deployment`
-- impact: confirmed no better installable skill path was required for this pass
-- rejected step: the CLI search timed out and did not change the execution plan
-
-## Linear MCP
+## linear
 
 - phase: rollout governance
-- usage: inspected the existing project and created `THA-16`, `THA-17`, `THA-18`
-- impact: mapped the current mission into urgent backlog items for auth, Prisma/Northflank and production-readiness work
+- usage: inspected the existing `BELEZAFOCO Production Launch` project
+- impact: kept the current delivery aligned with the already-created production launch backlog
 
-## Notion MCP
+## notion
 
-- phase: living documentation
-- usage: searched the workspace for existing BELEZAFOCO PRD/runbook pages and created two delta pages for this pass
-- impact: preserved an external written trace of the production auth bug, the deploy delta and the required next actions
+- phase: documentation routing
+- usage: attempted search / access
+- result: blocked by authentication
+- impact: formalized the repository docs as the live engineering documentation source for this wave
 
-## Sentry MCP
+## sentry
 
 - phase: observability audit
-- usage: identified org `thark-s4`, confirmed projects `belezafoco-api` and `belezafoco-web`, and verified DSNs exist
-- impact: confirmed Sentry wiring can be completed from existing org/project assets without creating new projects
+- usage: discovered the org and the existing projects `belezafoco-api` and `belezafoco-web`
+- impact: confirmed that the project already has a valid target for final backend/frontend monitoring wiring
 
-## TestSprite MCP
+## convex-mcp
 
-- phase: test-strategy exploration
-- usage: attempted code summary, PRD generation and frontend/backend test plan generation
-- impact: exposed that the workspace is missing expected TestSprite temp artifacts and that the current flow is only partially usable
-- rejected step: automated plan generation could not complete cleanly, so the testing strategy remains documented manually for now
+- phase: realtime evaluation
+- usage: attempted workspace status lookup
+- result: unauthorized
+- impact: reinforced the decision to reject Convex as a transactional or near-term operational dependency
 
-## Convex MCP
+## Resulting deliverables influenced by MCPs / skills
 
-- phase: architecture evaluation
-- usage: checked project status
-- impact: returned unauthorized
-- decision influenced: Convex remains formally rejected as a transactional core and is not part of the current production path
-
-## Playwright follow-up validation
-
-- phase: auth UX validation
-- usage: exercised the rebuilt register tab locally and confirmed password visibility toggles, double-password fields and automatic slug generation from the business name
-- impact: verified the requested auth behavior before deploy
-
-## Chrome DevTools follow-up validation
-
-- phase: combined-service validation
-- usage: loaded the rebuilt `/auth` page from the local Fastify combined service and checked console plus network state
-- impact: confirmed the auth shell, bundled assets and `/auth/config` request load cleanly in the same-origin deploy model
+- finance ledger schema + routes
+- agenda and finance cockpit pages
+- refreshed `.superdesign/init` route/page maps
+- updated audit and architecture docs
+- auth + Google docs
+- updated MCP log and rollout docs

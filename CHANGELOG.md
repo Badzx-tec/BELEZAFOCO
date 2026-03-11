@@ -2,6 +2,15 @@
 
 ## 2026-03-11
 
+- added the finance ledger foundation with `FinancialCategory`, `CostCenter`, `FinancialEntry` and `CashClosure`
+- created the finance API surface for dashboard, entries, commissions, cash closures and CSV export
+- synchronized appointment, payment webhook and public booking flows with ledger entries so finance is tied to real business events
+- expanded the authenticated shell with `/app/agenda` and `/app/financeiro` to match the cockpit direction from Superdesign
+- added premium local assets for the new agenda and finance surfaces in `apps/web/public/demo` and `apps/web/public/finance`
+- updated the seed with finance categories, receivables, expense, commission and cash-closure demo data
+- refreshed `.superdesign/init/routes.md` and `.superdesign/init/pages.md` so local Superdesign context matches the implemented route map
+- fixed the Vitest provider regressions by removing stray generated `.js` files from `apps/api/src` and restoring the source import path to `env.ts`
+- refreshed `docs/01-technical-audit.md`, `docs/02-architecture-decisions.md`, `docs/05-integrations-auth-google-email.md`, `docs/09-design-system.md`, `docs/10-mcp-usage-log.md`, `docs/12-superdesign-fidelity-plan.md` and `docs/13-rollout-plan.md`
 - synced the updated Superdesign auth, onboarding and billing drafts into the local app with new `/app/setup` and `/app/billing` routes
 - rebuilt `/auth` into a clean editorial auth surface with password visibility toggles, double password confirmation and automatic public-link slug preview from the business name
 - hardened email verification UX so successful confirmation performs a full redirect into the authenticated app flow

@@ -1,7 +1,7 @@
 import { useState, type PropsWithChildren, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Badge, Button } from "./ui";
-import { BrandMark, ChartIcon, SparkIcon, UsersIcon, WalletIcon } from "./premium";
+import { BrandMark, CalendarIcon, ChartIcon, ShieldIcon, SparkIcon, UsersIcon, WalletIcon } from "./premium";
 
 type AppShellProps = PropsWithChildren<{
   title: string;
@@ -10,11 +10,11 @@ type AppShellProps = PropsWithChildren<{
   workspaceSlug?: string;
   userName?: string;
   onLogout?: () => void;
-  activeSection?: "cockpit" | "setup" | "billing";
+  activeSection?: "cockpit" | "agenda" | "finance" | "setup" | "billing";
 }>;
 
 type SidebarItem = {
-  key: "cockpit" | "setup" | "billing" | "booking";
+  key: "cockpit" | "agenda" | "finance" | "setup" | "billing" | "booking";
   label: string;
   hint: string;
   icon: ReactNode;
@@ -30,13 +30,15 @@ function SidebarContent({
 }: {
   workspaceName: string;
   workspaceSlug?: string;
-  activeSection: "cockpit" | "setup" | "billing";
+  activeSection: "cockpit" | "agenda" | "finance" | "setup" | "billing";
   onClose?: () => void;
 }) {
   const sidebarItems: SidebarItem[] = [
     { key: "cockpit", label: "Cockpit", hint: "Operacao ativa", icon: <ChartIcon className="h-5 w-5" />, to: "/app" },
+    { key: "agenda", label: "Agenda", hint: "Fila e recepcao", icon: <CalendarIcon className="h-5 w-5" />, to: "/app/agenda" },
+    { key: "finance", label: "Financeiro", hint: "Ledger e caixa", icon: <WalletIcon className="h-5 w-5" />, to: "/app/financeiro" },
     { key: "setup", label: "Configurar estudio", hint: "Perfil e agenda", icon: <UsersIcon className="h-5 w-5" />, to: "/app/setup" },
-    { key: "billing", label: "Assinatura", hint: "Plano e upgrade", icon: <WalletIcon className="h-5 w-5" />, to: "/app/billing" },
+    { key: "billing", label: "Assinatura", hint: "Plano e upgrade", icon: <ShieldIcon className="h-5 w-5" />, to: "/app/billing" },
     ...(workspaceSlug
       ? [{ key: "booking" as const, label: "Link publico", hint: `/${workspaceSlug}`, icon: <SparkIcon className="h-5 w-5" />, href: `/b/${workspaceSlug}` }]
       : [])
@@ -147,7 +149,15 @@ export function AppShell({ title, subtitle, workspaceName, workspaceSlug, userNa
   const location = useLocation();
   const resolvedSection =
     activeSection ??
-    (location.pathname.startsWith("/app/setup") ? "setup" : location.pathname.startsWith("/app/billing") ? "billing" : "cockpit");
+    (location.pathname.startsWith("/app/setup")
+      ? "setup"
+      : location.pathname.startsWith("/app/billing")
+        ? "billing"
+        : location.pathname.startsWith("/app/agenda")
+          ? "agenda"
+          : location.pathname.startsWith("/app/financeiro")
+            ? "finance"
+            : "cockpit");
 
   return (
     <div className="relative min-h-screen overflow-hidden px-4 py-4 text-slate-900 sm:px-6 lg:px-8">

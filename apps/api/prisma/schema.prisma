@@ -82,6 +82,27 @@ enum AuthTokenType {
   reset_password
 }
 
+enum FinancialDirection {
+  inflow
+  outflow
+}
+
+enum FinancialEntryKind {
+  appointment_receivable
+  manual_receivable
+  manual_expense
+  commission
+  adjustment
+  payout
+}
+
+enum FinancialEntryStatus {
+  pending
+  paid
+  cancelled
+  overdue
+}
+
 model User {
   id            String         @id @default(cuid())
   email         String         @unique
@@ -95,6 +116,8 @@ model User {
   refreshTokens RefreshToken[]
   authTokens    AuthToken[]
   staffProfiles StaffMember[]
+  createdFinancialEntries FinancialEntry[] @relation("CreatedFinancialEntries")
+  cashClosures  CashClosure[]  @relation("CashClosures")
 }
 
 model RefreshToken {
@@ -155,6 +178,10 @@ model Workspace {
   auditLogs            AuditLog[]
   businessHours        BusinessHour[]
   calendarBlocks       CalendarBlock[]
+  financialCategories  FinancialCategory[]
+  costCenters          CostCenter[]
+  financialEntries     FinancialEntry[]
+  cashClosures         CashClosure[]
 }
 
 model Membership {
@@ -232,6 +259,7 @@ model StaffMember {
   staffServices     StaffService[]
   appointments      Appointment[]
   calendarBlocks    CalendarBlock[]
+  financialEntries  FinancialEntry[]
 
   @@index([workspaceId, active])
 }
@@ -331,6 +359,7 @@ model Appointment {
   client          Client            @relation(fields: [clientId], references: [id])
   payments        Payment[]
   reminders       ReminderLog[]
+  financialEntries FinancialEntry[]
 
   @@unique([staffMemberId, startAt])
   @@unique([resourceId, startAt])
@@ -355,6 +384,7 @@ model Payment {
   providerPayload String?
   createdAt      DateTime       @default(now())
   appointment    Appointment    @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  financialEntries FinancialEntry[]
 
   @@index([appointmentId, status])
 }
@@ -411,6 +441,91 @@ model WorkspaceSubscription {
   trialEndsAt           DateTime?
   appointmentsThisMonth Int                @default(0)
   workspace             Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model FinancialCategory {
+  id          String             @id @default(cuid())
+  workspaceId String
+  name        String
+  direction   FinancialDirection
+  colorHex    String             @default("#c26b36")
+  active      Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  entries     FinancialEntry[]
+
+  @@unique([workspaceId, name, direction])
+  @@index([workspaceId, direction, active])
+}
+
+model CostCenter {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  entries     FinancialEntry[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId, active])
+}
+
+model FinancialEntry {
+  id              String               @id @default(cuid())
+  workspaceId     String
+  categoryId      String?
+  costCenterId    String?
+  appointmentId   String?
+  paymentId       String?
+  staffMemberId   String?
+  createdByUserId String?
+  entryKey        String               @unique
+  title           String
+  description     String?
+  direction       FinancialDirection
+  kind            FinancialEntryKind
+  status          FinancialEntryStatus @default(pending)
+  amountCents     Int
+  dueDate         DateTime?
+  occurredAt      DateTime
+  paidAt          DateTime?
+  metadata        Json?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  workspace       Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  category        FinancialCategory?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  costCenter      CostCenter?          @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
+  appointment     Appointment?         @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  payment         Payment?             @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  staffMember     StaffMember?         @relation(fields: [staffMemberId], references: [id], onDelete: SetNull)
+  createdByUser   User?                @relation("CreatedFinancialEntries", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, direction, status, dueDate])
+  @@index([workspaceId, occurredAt])
+  @@index([appointmentId, kind])
+  @@index([paymentId, status])
+  @@index([staffMemberId, kind, status])
+}
+
+model CashClosure {
+  id                   String   @id @default(cuid())
+  workspaceId          String
+  closedByUserId       String?
+  openedAt             DateTime
+  closedAt             DateTime
+  inflowCents          Int
+  outflowCents         Int
+  expectedBalanceCents Int
+  actualBalanceCents   Int?
+  notes                String?
+  createdAt            DateTime @default(now())
+  workspace            Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  closedByUser         User?     @relation("CashClosures", fields: [closedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, closedAt])
 }
 
 model AuditLog {

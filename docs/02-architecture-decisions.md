@@ -8,111 +8,114 @@ Status: adopted
 
 Reason:
 
-- the current stack already supports tenant-aware auth, booking, audit and payment workflows
-- the main problem is production hardening, not a stack mismatch
-- moving the core to Convex, MongoDB or another backend would slow delivery without solving the current blockers
+- the current stack already supports auth, booking, billing, audit and webhook flows
+- the delivery problem is coherence and hardening, not stack mismatch
+- moving the transactional core would slow production readiness without solving current blockers
 
-## ADR-002: `Workspace` remains the canonical tenant
-
-Status: adopted
-
-Rule:
-
-- every authenticated operation must resolve `workspaceId` server-side
-- memberships stay as the RBAC source of truth
-- any lookup by resource id must continue to enforce workspace ownership
-
-## ADR-003: Convex is rejected as a transactional core
-
-Status: adopted
-
-Reason:
-
-- Convex MCP returned unauthorized for this workspace
-- there is no current real-time requirement strong enough to justify a second operational core
-- if used later, Convex must stay complementary only
-
-## ADR-004: Northflank combined service stays the primary topology
+## ADR-002: `Workspace` remains the canonical tenant boundary
 
 Status: adopted
 
 Rule:
 
-- one published service serves the compiled SPA and the Fastify API
-- reminders, reconciliation and migrations stay as separate jobs where possible
-- `RUN_MIGRATIONS_ON_START` remains a controlled fallback, not the default release path
+- every authenticated operation resolves `workspaceId` server-side
+- `Membership.role` remains the RBAC source of truth
+- every finance, booking, billing and auth mutation must continue to enforce workspace ownership
 
-Reason:
-
-- the live environment is already operating in this shape
-- the official Northflank guidance for Docker services + jobs fits this model well
-
-## ADR-005: Runtime and migration connections stay split
+## ADR-003: Superdesign is the visual source of truth
 
 Status: adopted
 
 Rule:
 
-- `DATABASE_URL` is the runtime connection
-- `DIRECT_URL` is reserved for migrations and direct CLI work
-- docs and env examples must keep this split explicit
+- the approved Superdesign project is the primary UI/UX reference
+- pages without explicit drafts must inherit the same visual system rather than inventing a new language
+- `.superdesign/init/*` must stay synchronized with the implemented route map
 
-Reason:
-
-- Prisma recommends direct connections for migrate flows, especially around poolers
-
-## ADR-006: Google Sign-In is gated by the published origin
+## ADR-004: Northflank combined service remains the production topology
 
 Status: adopted
 
 Rule:
 
-- `/auth/config` must not expose an active Google Sign-In button when the current published origin is not authorized
-- the backend must derive the live origin from request headers and compare it against `GOOGLE_ALLOWED_ORIGINS`, `PUBLIC_URL`, `API_BASE_URL` and `APP_URL`
-- the frontend must surface the real operational state instead of a generic pending badge
+- one service serves the compiled SPA and the Fastify API
+- migrations and workers stay as separate jobs where possible
+- `RUN_MIGRATIONS_ON_START` is a bridge only, not the preferred steady-state release path
 
-Reason:
-
-- production browser validation showed a real Google button failing publicly with `The given origin is not allowed for the given client ID`
-- a broken acquisition button is worse than a disabled one with an explicit operator message
-
-## ADR-007: Monorepo env loading must be cwd-agnostic
+## ADR-005: Auth model stays on `User.passwordHash + User.googleSub`
 
 Status: adopted
 
 Rule:
 
-- API env loading must search both package-local and workspace-root `.env` files
-- container and platform-provided envs still win because dotenv uses `override: false`
+- this wave preserves the current auth identity shape
+- Google login continues to validate the ID token on the server
+- when Google returns the same verified email as an existing password account, the account is linked instead of duplicated
+- no generic identity table is introduced in this production wave
 
-Reason:
-
-- local logs showed the API crashing when started from the monorepo root because JWT secrets were not loaded
-
-## ADR-008: Prisma 7 compatibility is tracked as a planned upgrade, not an emergency runtime migration
+## ADR-006: Google Sign-In is gated by published origin
 
 Status: adopted
 
 Rule:
 
-- the current release line can stay on Prisma 5 runtime packages while the team documents the Prisma 7 datasource migration path
-- the Prisma 7 move must be done as a controlled upgrade with `prisma.config.ts` and full repo validation, not as an opportunistic hotfix
+- `/auth/config` only exposes Google Sign-In when the current origin is authorized
+- `GOOGLE_ALLOWED_ORIGINS`, `PUBLIC_URL`, `API_BASE_URL` and `APP_URL` remain part of the deployment checklist
+- the remaining public OAuth blocker is treated as an external platform gate, not a backend bug
 
-Reason:
-
-- `prisma-local` surfaced a real compatibility gap with Prisma CLI 7.4.2
-- the live runtime issue this round was auth acquisition, not an active runtime crash caused by Prisma 5
-
-## ADR-009: Mercado Pago and WhatsApp integrations stay adapter-based
+## ADR-007: Financial module uses a ledger core
 
 Status: adopted
 
 Rule:
 
-- Mercado Pago continues through direct HTTP requests and secure webhook validation
-- WhatsApp Cloud API continues through provider abstraction, template mapping and webhook verification
-- credentials remain server-side only
+- the financial module is anchored on `FinancialEntry`
+- categories and cost centers are first-class models
+- appointment receivables are synced from booking/payment flows
+- manual receivables, expenses, commissions, adjustments and payouts are represented in the same ledger
+- cash closure is a separate aggregate over paid entries
 
 Reason:
 
-- adapter-based integrations are easier to observe, retry and audit than opaque SDK-heavy flows in this codebase
+- this is the minimum production-ready shape that supports finance UI fidelity, auditability and future reporting
+
+## ADR-008: Internal plan ids remain `trial`, `basic`, `pro`
+
+Status: adopted
+
+Rule:
+
+- backend and enforcement continue to use stable ids
+- frontend and commercial docs translate them as:
+  - `trial` => Fundador Solo
+  - `basic` => Fundador Equipe Pequena
+  - `pro` => Fundador Pro
+
+## ADR-009: Prisma runtime stability beats opportunistic tool churn
+
+Status: adopted
+
+Rule:
+
+- runtime stays on the stable app-managed Prisma 5 line for now
+- the Prisma CLI 7 config gap is documented and isolated as tooling debt
+- production delivery does not pause for a broad Prisma upgrade during this wave
+
+## ADR-010: Notion is temporarily non-authoritative
+
+Status: adopted
+
+Rule:
+
+- repository docs are the live source of truth until Notion auth is restored
+- once access returns, key docs may be mirrored into Notion, but the repo remains authoritative for engineering rollout
+
+## ADR-011: Convex is rejected as transactional core
+
+Status: adopted
+
+Reason:
+
+- Convex MCP remains unauthorized in this workspace
+- no current requirement justifies a second operational core
+- if real-time gets adopted later, it must stay additive only

@@ -1,15 +1,15 @@
 import { existsSync } from "node:fs";
-import path from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { config as loadDotenv } from "dotenv";
 import { z } from "zod";
 
-const currentDir = path.dirname(fileURLToPath(import.meta.url));
+const currentDir = dirname(fileURLToPath(import.meta.url));
 const envCandidates = [
   process.env.BELEZAFOCO_ENV_PATH,
-  path.resolve(process.cwd(), ".env"),
-  path.resolve(process.cwd(), "../../.env"),
-  path.resolve(currentDir, "../../../.env")
+  resolve(process.cwd(), ".env"),
+  resolve(process.cwd(), "../../.env"),
+  resolve(currentDir, "../../../.env")
 ].filter((candidate): candidate is string => typeof candidate === "string" && candidate.length > 0);
 
 for (const candidate of envCandidates) {

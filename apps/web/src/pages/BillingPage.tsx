@@ -129,7 +129,7 @@ export function BillingPage() {
                 <div>
                   <SectionTag>Planos Fundador</SectionTag>
                   <h2 className="mt-4 text-3xl font-semibold text-slate-950">Escolha o plano que acompanha a operacao do estudio.</h2>
-                  <p className="mt-3 text-sm leading-7 text-slate-500">Os cards abaixo refletem o catalogo real retornado pelo backend do workspace.</p>
+                  <p className="mt-3 text-sm leading-7 text-slate-500">Compare os planos Fundador com clareza e escolha a operacao ideal para esta fase do negocio.</p>
                 </div>
                 <SparkIcon className="h-6 w-6 text-slate-500" />
               </div>
@@ -216,7 +216,7 @@ export function BillingPage() {
                     <ShieldIcon className="h-4 w-4" />
                   </span>
                   <p className="text-sm leading-7 text-slate-500">
-                    Esta tela nao simula checkout fake. Ela registra um pedido real de upgrade no backend, com trilha de auditoria por workspace.
+                    O pedido de ativacao fica registrado com seguranca para acompanhamento comercial e operacional do workspace.
                   </p>
                 </div>
 
