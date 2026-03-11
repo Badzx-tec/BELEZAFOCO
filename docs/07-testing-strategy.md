@@ -139,3 +139,8 @@ corepack pnpm -r test
 corepack pnpm -r build
 corepack pnpm --filter @belezafoco/api prisma:generate
 ```
+
+## Observacao de smoke demo
+
+- `/b/demo-beleza` deve permanecer como rota fixa de validacao visual em staging quando `PUBLIC_DEMO_ENABLED=true`
+- isso protege Playwright, smoke manual e demo comercial contra ambientes publicados sem seed

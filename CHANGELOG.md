@@ -2,6 +2,18 @@
 
 ## 2026-03-10
 
+### Hardening transacional e caminho de produção
+
+- `IdempotencyKey` passou a usar `namespaceKey` único por `scope + workspace + key`
+- helper de idempotência agora rejeita replay com payload divergente
+- booking público passou a reutilizar resposta persistida e a serializar `payment` sem expor payload bruto do provider
+- provider do Mercado Pago passou a suportar criação real de Pix via API oficial quando habilitado
+- webhook do Mercado Pago passou a aceitar payload oficial, validar assinatura HMAC e consultar o pagamento na API do provider
+- `schema.prisma` recebeu `directUrl` e o wrapper do Prisma passou a fazer fallback de `DIRECT_URL`
+- `.env.example` e `northflank.env.example` ganharam `DIRECT_URL` e `API_BASE_URL`
+- testes unitários adicionados para namespace de idempotência e assinatura/status do Mercado Pago
+- docs criados/atualizados: auditoria técnica, ADRs, Northflank deploy, security checklist, design system, MCP usage log e trilha inicial do financeiro
+
 ### Deploy e staging
 
 - `Caddyfile` ajustado para usar `API_UPSTREAM` configuravel, deixando o `web` pronto para Compose e Northflank
@@ -120,3 +132,8 @@
 - testes do backend validados
 - build do frontend validado
 - teste utilitario inicial do frontend validado
+
+### Demo e staging
+
+- `demo-beleza` virou slug reservado de demo e smoke com fallback sintÃ©tico controlado para Northflank e QA visual
+- `.env.example` e `northflank.env.example` ganharam `PUBLIC_DEMO_ENABLED`

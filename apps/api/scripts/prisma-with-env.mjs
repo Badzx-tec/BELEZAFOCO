@@ -19,6 +19,8 @@ for (const candidate of candidates) {
   break;
 }
 
+process.env.DIRECT_URL ||= process.env.DATABASE_URL;
+
 const child = spawn(process.execPath, [prismaCliPath, ...process.argv.slice(2)], {
   stdio: "inherit",
   env: process.env

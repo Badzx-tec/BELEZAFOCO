@@ -1,136 +1,105 @@
-# Auditoria Tecnica do BELEZAFOCO
+# Auditoria Técnica do BELEZAFOCO
 
-Data da auditoria: 2026-03-10
-
-## Escopo validado nesta execucao
-
-- auditoria do repositorio local e do espelho remoto via GitHub MCP
-- leitura do schema Prisma e tentativa de `migrate status` via Prisma MCP
-- validacao de docs atuais via Context7
-- validacao de build e testes do monorepo
-- validacao manual da UX no navegador via Chrome DevTools
-- criacao de backlog operacional no Linear
-- registro de PRD e runbook no Notion
-- sondagem de observabilidade real no Sentry
+Data: 2026-03-10
 
 ## Resumo executivo
 
-O BELEZAFOCO ja tem base de produto, stack correta e direcao comercial coerente para beauty SaaS no Brasil. O monorepo builda, os testes atuais passam, o core relacional em Prisma/PostgreSQL esta bem encaminhado e a experiencia visual da landing e do booking tem identidade acima do nivel de template barato.
+O repositório já parte de uma base correta para um SaaS de agenda no nicho de beleza: monorepo `pnpm`, backend em Fastify + Prisma + PostgreSQL, frontend React + Vite, multi-tenant com `Workspace`, booking público, billing inicial, audit log, health checks e worker separado.
 
-O projeto ainda nao esta pronto para producao real. Os bloqueios atuais nao pedem reescrita; pedem hardening objetivo. Nesta execucao foi entregue a primeira refatoracao estrutural critica do motor de agenda: `Resource.capacity` passou a ser respeitado por unidade de recurso com alocacao transacional e retry serializable. Tambem foi corrigido um problema real de ambiente local entre `localhost` e `127.0.0.1`, e o runtime da API voltou a subir com Fastify 5 apos corrigir a major do `@fastify/sensible`.
+O projeto ainda não está em nível de produção comercial. O principal gap encontrado nesta etapa foi a fundação transacional: a tabela de idempotência era global por `key`, sem namespacing por escopo/tenant, e o fluxo público de booking não protegia adequadamente replays com payload divergente. Em paralelo, o caminho de deploy precisava separar `DATABASE_URL` e `DIRECT_URL` para runtime e migrations.
 
-O principal bloqueio operacional restante hoje e infraestrutura local: o backend sobe, mas o banco nao esta acessivel em `localhost:5432`, e o Docker Desktop local esta com daemon indisponivel. Isso impede validar o fluxo completo do booking publico, seed e queries reais nesta sessao.
+## O que foi auditado
+
+- árvore local e espelho remoto via GitHub MCP
+- `schema.prisma`, migrations e toolchain Prisma
+- Dockerfile, envs e caminho de deploy
+- rotas de booking, payments, webhooks e tenant enforcement
+- docs oficiais atuais via Context7 e web
+- backlog e documentação viva via Linear e Notion
+- disponibilidade de Sentry, shadcn, Figma, TestSprite, Convex, Chrome DevTools e Playwright MCPs
 
 ## Estado atual confirmado
 
-## O que esta bom
+### Base saudável
 
-- monorepo `pnpm` com separacao clara entre `apps/api`, `apps/web` e `packages/shared`
-- backend em Fastify + Zod + Prisma com `health` e `ready`
-- frontend React + Vite + Tailwind com direcao visual comercial consistente
-- schema relacional amplo para workspaces, memberships, staff, servicos, agenda, pagamentos, mensagens e auditoria
-- idempotencia inicial para booking e webhooks
-- Sentry ja integrado em codigo para API e frontend
-- build e testes atuais passam localmente
+- `apps/api` e `apps/web` estão bem separados
+- `schema.prisma` já está em PostgreSQL e cobre workspaces, memberships, agenda, pagamentos, mensagens, waitlist e auditoria
+- `worker.ts` já separa reminders, reconciliação e cleanup
+- Sentry já está integrado em backend e frontend
+- build da API e testes atuais passam
 
-## O que foi corrigido nesta rodada
+### Bloqueios reais para produção
 
-- `AppointmentSegment` agora suporta capacidade real de recurso por `resourceUnit`
-- o booking passou a usar transacao `Serializable` com retry para conflito `P2034`, alinhado a recomendacao atual do Prisma
-- o calculo de slots agora so bloqueia recurso quando todas as unidades daquele horario estiverem ocupadas
-- o frontend deixou de depender de um fallback fixo para `http://localhost:3333`, inferindo o host correto quando roda em preview/dev
-- o backend passou a aceitar por default origens locais de `localhost` e `127.0.0.1` em portas `5173` e `4173`
-- o runtime da API voltou a ser compativel com Fastify 5 com `@fastify/sensible@6`
+1. Idempotência frágil
+   - `IdempotencyKey.key` era única globalmente
+   - não havia namespacing por `scope + workspace`
+   - um replay com payload diferente podia reutilizar a mesma chave
 
-## Validacoes executadas
+2. Caminho de migrations incompleto para produção
+   - o runtime usava `DATABASE_URL`, mas o deploy ainda não documentava `DIRECT_URL`
+   - sem separar conexão pooled e conexão direta, o caminho com PgBouncer/Northflank ficava frágil
 
-- `corepack pnpm -r test`: aprovado
-- `corepack pnpm -r build`: aprovado
+3. Mercado Pago incompleto
+   - criação de Pix estava em modo mock/placeholder
+   - webhook aceitava apenas payload simplificado
+   - assinatura oficial e consulta posterior do pagamento ainda não estavam materializadas
+
+4. Tooling Prisma heterogêneo
+   - projeto local em Prisma `5.22`
+   - Prisma MCP da sessão em `7.x`, incompatível com o formato atual de datasource
+   - isso impacta inspeção via MCP, não o app em si
+
+5. Banco local indisponível para migrations
+   - `prisma generate`, build e testes passaram
+   - `prisma migrate deploy` não pôde ser validado localmente porque o banco não estava acessível para novos processos CLI
+
+## Correção estrutural entregue nesta etapa
+
+### Idempotência endurecida
+
+- `IdempotencyKey` agora usa `namespaceKey` único
+- o namespace é `scope:workspaceId:key` com fallback `global`
+- o helper agora detecta conflito quando a mesma chave volta com `requestHash` diferente
+- o booking público passou a preferir replay persistido e a rejeitar reuso indevido
+
+### Booking público endurecido
+
+- a resposta persistida de replay agora inclui `payment` serializado quando houver Pix
+- o fluxo evita expor `rawPayload` do provider para o cliente público
+- o booking guarda a resposta final somente depois de concluir a criação do Pix
+
+### Fundamento de deploy Prisma/Northflank
+
+- `datasource` recebeu `directUrl`
+- o wrapper `prisma-with-env.mjs` faz fallback de `DIRECT_URL` para `DATABASE_URL`
+- `.env.example` e `northflank.env.example` foram atualizados com `DIRECT_URL` e `API_BASE_URL`
+
+### Mercado Pago mais próximo do real
+
+- o provider agora cria Pix real via `POST /v1/payments` quando `MERCADO_PAGO_ENABLED=true`
+- o webhook aceita payload oficial, verifica assinatura HMAC e busca detalhes do pagamento na API do Mercado Pago
+- o modo mock legado foi mantido para ambiente local e testes
+
+## Validação desta etapa
+
 - `corepack pnpm --filter @belezafoco/api prisma:generate`: aprovado
-- `GET /health` em `http://127.0.0.1:3333/health`: aprovado
-- Chrome DevTools em `http://localhost:5173/b/demo-beleza`: CORS corrigido; erro restante passou a ser conexao com banco, nao mais origem cruzada
+- `corepack pnpm --filter @belezafoco/api build`: aprovado
+- `corepack pnpm --filter @belezafoco/api test`: aprovado
+- novas suites:
+  - `apps/api/tests/idempotency.test.ts`
+  - `apps/api/tests/mercadopago-provider.test.ts`
 
-## Riscos e bloqueios atuais
+## Riscos remanescentes
 
-## 1. PostgreSQL local indisponivel
+- `prisma migrate deploy` segue sem validação ponta a ponta nesta máquina por indisponibilidade do banco para novos processos
+- o frontend não pôde ser validado em servidor persistente nesta sessão, então Chrome DevTools/Playwright ficaram limitados pelo ambiente
+- WhatsApp Cloud API continua sem integração real
+- módulo financeiro ainda precisa de modelagem de ledger, comissões, AP/AR e UX própria
 
-Fato observado:
+## Próximos passos recomendados
 
-- o backend responde em `health`, mas qualquer query Prisma falha com `Can't reach database server at localhost:5432`
-- o Docker CLI existe, porem o daemon do Docker Desktop nao esta ativo nesta maquina
-
-Impacto:
-
-- sem banco ativo nao ha como validar seed, dashboard autenticado, booking publico real ou migrations aplicadas
-
-## 2. Prisma MCP exposto a incompatibilidade de toolchain
-
-Fato observado:
-
-- o Prisma MCP usa Prisma CLI `7.4.2`
-- o projeto segue em Prisma `5.22.0`
-- o `schema.prisma` ainda usa `datasource.url`, o que o CLI 7 ja nao aceita no mesmo formato
-
-Impacto:
-
-- o review via Prisma MCP foi util para detectar o problema, mas o fluxo completo de migrate/status via MCP continua bloqueado
-- isso nao quebra o app em si, mas precisa entrar no backlog de modernizacao da toolchain
-
-## 3. Integracoes externas ainda nao sao reais
-
-Estado atual:
-
-- Mercado Pago continua em modo adapter stub
-- WhatsApp Cloud API continua em camada mock/provider inicial
-
-Impacto:
-
-- o produto ainda nao entrega sinal Pix real nem lembretes reais no WhatsApp
-
-## 4. Cobertura automatizada ainda e estreita
-
-Estado atual:
-
-- testes existentes cobrem scheduler, plano, dedupe de reminder e agora capacidade de recurso
-- ainda faltam testes de auth, multi-tenant leakage, webhook, refresh, booking end-to-end e API integration
-
-Impacto:
-
-- a base melhorou no coracao da agenda, mas ainda nao tem rede de seguranca suficiente para go-live
-
-## 5. Frontend autenticado ainda concentra muita logica em paginas grandes
-
-Fato observado:
-
-- `DashboardPage.tsx` continua grande, com leitura, mutacoes e apresentacao acopladas
-
-Impacto:
-
-- manutencao mais cara
-- menor clareza para evoluir onboarding, agenda e CRM de forma profissional
-
-## 6. Playwright MCP nao esta disponivel nesta sessao
-
-Fato observado:
-
-- o pedido original exige Playwright, mas esta sessao nao expõe um MCP de Playwright
-
-Impacto:
-
-- a validacao de navegador desta rodada foi feita com Chrome DevTools
-- a estrategia continua sendo adotar Playwright no repositorio como padrao de E2E, mas a automacao via MCP nao pode ser executada nesta sessao
-
-## Decisao tecnica consolidada
-
-- manter Fastify + Prisma + PostgreSQL + React + Vite
-- rejeitar reescrita do core
-- endurecer backend por dominio
-- manter Convex fora do core e fora do escopo atual ate existir caso real de realtime complementar
-
-## Proximos passos recomendados
-
-1. Levantar PostgreSQL local ou staging para validar migrations, seed e booking end-to-end.
-2. Implementar camada real de Mercado Pago com idempotencia e reconciliacao.
-3. Implementar camada real de WhatsApp Cloud API com templates, logs e retries.
-4. Extrair `DashboardPage` em modulos menores e introduzir agenda diaria/semanal/mensal de verdade.
-5. Adicionar suite de testes de API e E2E com Playwright no proprio repositorio.
+1. Aplicar a migration nova em um PostgreSQL acessível e validar `_prisma_migrations`.
+2. Subir o frontend em um preview estável e executar smoke/E2E com Playwright.
+3. Evoluir o design system com shadcn para dashboard, agenda, financeiro e onboarding.
+4. Implementar o módulo financeiro com ledger auditável.
+5. Fechar WhatsApp Cloud API com templates, logs e retries.

@@ -6,6 +6,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(3333),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
   DATABASE_URL: z.string().default("postgresql://postgres:postgres@localhost:5432/belezafoco"),
+  DIRECT_URL: z.string().optional(),
   REDIS_URL: z.string().optional(),
   JWT_ACCESS_SECRET: z.string().min(16),
   JWT_REFRESH_SECRET: z.string().min(16),
@@ -14,6 +15,8 @@ const envSchema = z.object({
   CORS_ORIGIN: z
     .string()
     .default("http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173"),
+  API_BASE_URL: z.string().default("http://localhost:3333"),
+  PUBLIC_DEMO_ENABLED: z.coerce.boolean().default(true),
   SUPERADMIN_EMAIL: z.string().email().optional(),
   WHATSAPP_PROVIDER: z.enum(["mock", "cloud_api", "none"]).default("mock"),
   WHATSAPP_CLOUD_API_TOKEN: z.string().optional(),

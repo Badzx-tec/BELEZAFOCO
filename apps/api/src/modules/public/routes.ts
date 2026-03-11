@@ -1,15 +1,25 @@
-import { FastifyPluginAsync } from "fastify";
+import { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { env } from "../../config/env.js";
 import { prisma } from "../../lib/prisma.js";
 import { createAppointment, getPublicBookingContext, listAvailableSlots } from "../../lib/booking.js";
-import { rememberIdempotency } from "../../lib/idempotency.js";
+import { findIdempotency, IdempotencyConflictError, rememberIdempotency } from "../../lib/idempotency.js";
 import { sha256 } from "../../lib/crypto.js";
+import {
+  DEMO_PUBLIC_SLUG,
+  createDemoPublicBookingResponse,
+  createDemoPublicSlotsResponse,
+  demoPublicWorkspaceResponse
+} from "./demo.js";
 import { MercadoPagoProvider } from "../payments/provider.js";
 
 export const publicRoutes: FastifyPluginAsync = async (app) => {
   app.get("/public/b/:slug", async (req) => {
     const { slug } = z.object({ slug: z.string() }).parse(req.params);
+    if (env.PUBLIC_DEMO_ENABLED && slug === DEMO_PUBLIC_SLUG) {
+      return demoPublicWorkspaceResponse;
+    }
     const { workspace, services, staffMembers } = await getPublicBookingContext(slug);
 
     return {
@@ -42,6 +52,9 @@ export const publicRoutes: FastifyPluginAsync = async (app) => {
       })
       .parse(req.query);
     const { slug } = z.object({ slug: z.string() }).parse(req.params);
+    if (env.PUBLIC_DEMO_ENABLED && slug === DEMO_PUBLIC_SLUG) {
+      return createDemoPublicSlotsResponse(query.date, query.serviceId, query.staffMemberId);
+    }
     const workspace = await prisma.workspace.findUniqueOrThrow({ where: { slug } });
     const result = await listAvailableSlots({
       workspaceId: workspace.id,
@@ -71,30 +84,73 @@ export const publicRoutes: FastifyPluginAsync = async (app) => {
       })
       .parse(req.body);
     const { slug } = z.object({ slug: z.string() }).parse(req.params);
+    if (env.PUBLIC_DEMO_ENABLED && slug === DEMO_PUBLIC_SLUG) {
+      const response = createDemoPublicBookingResponse({
+        serviceId: body.serviceId,
+        startAt: body.startAt
+      });
+      if (!response) {
+        throw app.httpErrors.notFound("Servico demo nao encontrado.");
+      }
+      return response;
+    }
     const workspace = await prisma.workspace.findUniqueOrThrow({ where: { slug } });
     if (!workspace.publicBookingEnabled) {
       throw app.httpErrors.forbidden("Agendamento publico desabilitado para este negocio.");
     }
 
-    const requestFingerprint = sha256(JSON.stringify({
-      slug,
-      serviceId: body.serviceId,
-      staffMemberId: body.staffMemberId,
-      startAt: body.startAt,
-      whatsapp: body.whatsapp
-    }));
+    const requestFingerprint = sha256(
+      JSON.stringify({
+        slug,
+        serviceId: body.serviceId,
+        staffMemberId: body.staffMemberId,
+        startAt: body.startAt,
+        whatsapp: body.whatsapp
+      })
+    );
     const idempotencyKey = (req.headers["x-idempotency-key"] as string | undefined) ?? `public:${requestFingerprint}`;
+    const remembered = await findIdempotency({
+      scope: "public_booking",
+      key: idempotencyKey,
+      workspaceId: workspace.id
+    });
 
-    const existing = await prisma.appointment.findUnique({ where: { idempotencyKey } });
+    if (remembered) {
+      if (remembered.requestHash && remembered.requestHash !== requestFingerprint) {
+        throw app.httpErrors.conflict("Esta chave de idempotencia ja foi usada com outro payload.");
+      }
+
+      if (isBookingReplayResponse(remembered.responseBody)) {
+        return {
+          ...remembered.responseBody,
+          duplicated: true
+        };
+      }
+    }
+
+    const existing = await prisma.appointment.findUnique({
+      where: { idempotencyKey },
+      include: {
+        payments: {
+          orderBy: { createdAt: "desc" },
+          take: 1
+        }
+      }
+    });
     if (existing) {
-      return { appointmentId: existing.id, status: existing.status, duplicated: true };
+      return {
+        appointmentId: existing.id,
+        status: existing.status,
+        payment: existing.payments[0] ? serializePayment(existing.payments[0]) : undefined,
+        duplicated: true
+      };
     }
 
     const client = await prisma.client.upsert({
       where: {
         workspaceId_whatsapp: {
           workspaceId: workspace.id,
-          whatsapp: body.whatsapp
+          whatsapp: body.whatsapp,
         }
       },
       update: {
@@ -137,15 +193,6 @@ export const publicRoutes: FastifyPluginAsync = async (app) => {
       throw error;
     }
 
-    await rememberIdempotency({
-      scope: "public_booking",
-      key: idempotencyKey,
-      workspaceId: workspace.id,
-      requestHash: requestFingerprint,
-      responseBody: { appointmentId: created.appointment.id, status: created.status },
-      statusCode: 201
-    });
-
     if (created.status === "pending_payment") {
       const provider = new MercadoPagoProvider();
       const payment = await provider.createPixCharge({
@@ -153,10 +200,11 @@ export const publicRoutes: FastifyPluginAsync = async (app) => {
         description: `Sinal ${workspace.name}`,
         payerName: client.name,
         payerEmail: client.email ?? undefined,
-        idempotencyKey
+        idempotencyKey,
+        externalReference: created.appointment.id
       });
 
-      await prisma.payment.create({
+      const savedPayment = await prisma.payment.create({
         data: {
           appointmentId: created.appointment.id,
           amount: created.depositAmount ?? 0,
@@ -171,17 +219,100 @@ export const publicRoutes: FastifyPluginAsync = async (app) => {
         }
       });
 
-      return {
+      const response = {
         appointmentId: created.appointment.id,
         status: created.status,
-        payment
+        payment: serializePayment(savedPayment)
       };
+
+      await persistReplayOrThrow(app, {
+        key: idempotencyKey,
+        workspaceId: workspace.id,
+        requestHash: requestFingerprint,
+        response
+      });
+
+      return response;
     }
 
-    return {
+    const response = {
       appointmentId: created.appointment.id,
       status: created.status,
       confirmationCode: randomUUID()
     };
+
+    await persistReplayOrThrow(app, {
+      key: idempotencyKey,
+      workspaceId: workspace.id,
+      requestHash: requestFingerprint,
+      response
+    });
+
+    return response;
   });
 };
+
+async function persistReplayOrThrow(
+  app: FastifyInstance,
+  input: {
+    key: string;
+    workspaceId: string;
+    requestHash: string;
+    response: {
+      appointmentId: string;
+      status: string;
+      confirmationCode?: string;
+      payment?: {
+        externalId: string | null;
+        qrCode: string | null;
+        pixCopyPaste: string | null;
+        expiresAt: string | null;
+      };
+    };
+  }
+) {
+  try {
+    await rememberIdempotency({
+      scope: "public_booking",
+      key: input.key,
+      workspaceId: input.workspaceId,
+      requestHash: input.requestHash,
+      responseBody: input.response,
+      statusCode: 201
+    });
+  } catch (error) {
+    if (error instanceof IdempotencyConflictError) {
+      throw app.httpErrors.conflict("Esta chave de idempotencia ja foi usada com outro payload.");
+    }
+
+    throw error;
+  }
+}
+
+function isBookingReplayResponse(value: unknown): value is {
+  appointmentId: string;
+  status: string;
+  confirmationCode?: string;
+  payment?: {
+    externalId: string | null;
+    qrCode: string | null;
+    pixCopyPaste: string | null;
+    expiresAt: string | null;
+  };
+} {
+  return Boolean(value && typeof value === "object" && "appointmentId" in value && "status" in value);
+}
+
+function serializePayment(payment: {
+  externalId: string | null;
+  qrCode: string | null;
+  pixCopyPaste: string | null;
+  expiresAt: Date | null;
+}) {
+  return {
+    externalId: payment.externalId,
+    qrCode: payment.qrCode,
+    pixCopyPaste: payment.pixCopyPaste,
+    expiresAt: payment.expiresAt?.toISOString() ?? null
+  };
+}
