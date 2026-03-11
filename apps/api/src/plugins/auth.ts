@@ -42,8 +42,6 @@ export default fp(async (app) => {
       data: {
         tokenHash: sha256(refreshToken),
         userId: meta.userId,
-        ipAddress: meta.ipAddress,
-        userAgent: meta.userAgent,
         expiresAt: addDays(new Date(), env.JWT_REFRESH_TTL_DAYS)
       }
     });

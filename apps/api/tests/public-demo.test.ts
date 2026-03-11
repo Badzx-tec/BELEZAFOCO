@@ -10,9 +10,12 @@ describe("public demo fallback", () => {
   it("exposes deterministic demo slots for the reserved slug", () => {
     const response = createDemoPublicSlotsResponse("2026-03-11", "service-cut");
 
-    expect(response.staffMemberId).toBe("staff-joao");
+    expect(response.staff[0]).toMatchObject({ id: "staff-joao" });
     expect(response.slots).toHaveLength(4);
-    expect(response.slots[0]).toBe("2026-03-11T12:15:00.000Z");
+    expect(response.slots[0]).toEqual({
+      staffMemberId: "staff-joao",
+      startAt: "2026-03-11T12:15:00.000Z"
+    });
   });
 
   it("creates confirmed bookings for demo services without deposit", () => {

@@ -13,6 +13,7 @@ describe("mercadopago provider", () => {
     process.env.DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/belezafoco?schema=public";
     process.env.MP_ACCESS_TOKEN = "TEST-TOKEN";
     process.env.PUBLIC_URL = "https://belezafoco.app";
+    process.env.API_BASE_URL = "https://api.belezafoco.app";
   });
 
   afterEach(() => {
@@ -53,6 +54,9 @@ describe("mercadopago provider", () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.mercadopago.com/v1/payments");
     expect((fetchMock.mock.calls[0]?.[1] as RequestInit)?.headers).toMatchObject({
       "X-Idempotency-Key": "booking-123"
+    });
+    expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit)?.body))).toMatchObject({
+      notification_url: "https://api.belezafoco.app/payments/webhook/mercadopago"
     });
     expect(payment).toMatchObject({
       externalId: "123456789",

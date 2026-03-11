@@ -22,6 +22,7 @@ import { paymentRoutes } from "./modules/payments/routes.js";
 import { billingRoutes } from "./modules/billing/routes.js";
 import { clientRoutes } from "./modules/clients/routes.js";
 import { dashboardRoutes } from "./modules/dashboard/routes.js";
+import { messagingRoutes } from "./modules/messaging/routes.js";
 import { env } from "./config/env.js";
 import { prisma } from "./lib/prisma.js";
 import { captureServerError, initSentry } from "./lib/sentry.js";
@@ -60,7 +61,7 @@ export function buildApp() {
     requestIdHeader: "x-request-id",
     genReqId: () => randomUUID(),
     logger: {
-      level: env.NODE_ENV === "production" ? "info" : "debug"
+      level: env.LOG_LEVEL
     }
   });
 
@@ -135,6 +136,7 @@ export function buildApp() {
   app.register(appointmentRoutes);
   app.register(waitlistRoutes);
   app.register(paymentRoutes);
+  app.register(messagingRoutes);
   app.register(billingRoutes);
   app.register(clientRoutes);
   app.register(dashboardRoutes);

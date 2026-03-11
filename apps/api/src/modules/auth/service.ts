@@ -6,6 +6,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { env } from "../../config/env.js";
 import { sendEmail } from "../../lib/mailer.js";
 import { prisma } from "../../lib/prisma.js";
+import { buildPublicAuthConfig } from "./publicAuthConfig.js";
 
 type MembershipWithWorkspace = {
   workspaceId: string;
@@ -603,11 +604,15 @@ export async function getMe(userId: string) {
   };
 }
 
-export function getPublicAuthConfig() {
-  return {
-    googleEnabled: Boolean(env.GOOGLE_CLIENT_ID),
-    googleClientId: env.GOOGLE_CLIENT_ID ?? null,
-    emailPasswordEnabled: true,
-    emailVerificationRequired: true
-  };
+export function getPublicAuthConfig(requestOrigin?: string | null) {
+  return buildPublicAuthConfig(
+    {
+      googleClientId: env.GOOGLE_CLIENT_ID,
+      googleAllowedOrigins: env.GOOGLE_ALLOWED_ORIGINS,
+      publicUrl: env.PUBLIC_URL,
+      apiBaseUrl: env.API_BASE_URL,
+      appUrl: env.APP_URL
+    },
+    requestOrigin
+  );
 }

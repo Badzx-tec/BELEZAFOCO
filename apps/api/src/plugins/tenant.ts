@@ -18,7 +18,7 @@ export default fp(async (app) => {
       return;
     }
 
-    await app.auth(req as any);
+    await app.authenticate(req as any);
 
     if (isAdminRoute) return;
 

@@ -6,6 +6,10 @@ export function formatCurrency(value?: number | null) {
   }).format(value / 100);
 }
 
+export function currencyInCents(value?: number | null) {
+  return formatCurrency(value);
+}
+
 export function formatDateLabel(value: string) {
   return new Intl.DateTimeFormat("pt-BR", {
     weekday: "short",
@@ -44,4 +48,12 @@ export function nextDateKeys(days: number) {
   }
 
   return out;
+}
+
+export function readableError(error: unknown) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return "Erro inesperado";
 }

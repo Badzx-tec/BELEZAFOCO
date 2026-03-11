@@ -1,5 +1,12 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
+import { env } from "../../config/env.js";
+import {
+  createDemoPublicBookingResponse,
+  createDemoPublicSlotsResponse,
+  demoPublicWorkspaceResponse,
+  shouldUsePublicDemoFallback
+} from "./demo.js";
 import { PublicNotFoundError, createPublicBooking, getPublicSlots, getPublicWorkspaceData } from "./service.js";
 
 export const publicRoutes: FastifyPluginAsync = async (app) => {
@@ -8,6 +15,10 @@ export const publicRoutes: FastifyPluginAsync = async (app) => {
     try {
       return await getPublicWorkspaceData(slug);
     } catch (error) {
+      if (shouldUsePublicDemoFallback({ slug, error, enabled: env.PUBLIC_DEMO_ENABLED })) {
+        return demoPublicWorkspaceResponse;
+      }
+
       if (error instanceof PublicNotFoundError) {
         throw app.httpErrors.notFound(error.message);
       }
@@ -28,6 +39,10 @@ export const publicRoutes: FastifyPluginAsync = async (app) => {
     try {
       return await getPublicSlots({ slug, ...query });
     } catch (error) {
+      if (shouldUsePublicDemoFallback({ slug, error, enabled: env.PUBLIC_DEMO_ENABLED })) {
+        return createDemoPublicSlotsResponse(query.date, query.serviceId, query.staffMemberId);
+      }
+
       if (error instanceof PublicNotFoundError) {
         throw app.httpErrors.notFound(error.message);
       }
@@ -61,6 +76,16 @@ export const publicRoutes: FastifyPluginAsync = async (app) => {
         idempotencyKey: typeof idempotencyKey === "string" ? idempotencyKey : undefined
       });
     } catch (error) {
+      if (shouldUsePublicDemoFallback({ slug, error, enabled: env.PUBLIC_DEMO_ENABLED })) {
+        const response = createDemoPublicBookingResponse({
+          serviceId: body.serviceId,
+          startAt: body.startAt
+        });
+        if (response) {
+          return response;
+        }
+      }
+
       if (error instanceof PublicNotFoundError) {
         throw app.httpErrors.notFound(error.message);
       }

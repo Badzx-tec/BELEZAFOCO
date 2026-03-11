@@ -1,5 +1,12 @@
-import { describe, expect, it } from "vitest";
-import { buildIdempotencyNamespace } from "../src/lib/idempotency.js";
+import { beforeAll, describe, expect, it } from "vitest";
+
+let buildIdempotencyNamespace: typeof import("../src/lib/idempotency.js")["buildIdempotencyNamespace"];
+
+beforeAll(async () => {
+  process.env.JWT_ACCESS_SECRET ||= "test-access-secret";
+  process.env.JWT_REFRESH_SECRET ||= "test-refresh-secret";
+  ({ buildIdempotencyNamespace } = await import("../src/lib/idempotency.js"));
+});
 
 describe("idempotency namespace", () => {
   it("namespaces keys by scope and workspace", () => {

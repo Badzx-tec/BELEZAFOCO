@@ -1,105 +1,106 @@
-# Auditoria Técnica do BELEZAFOCO
+# Technical Audit
 
-Data: 2026-03-10
+Date base: 2026-03-11
 
-## Resumo executivo
+## Executive summary
 
-O repositório já parte de uma base correta para um SaaS de agenda no nicho de beleza: monorepo `pnpm`, backend em Fastify + Prisma + PostgreSQL, frontend React + Vite, multi-tenant com `Workspace`, booking público, billing inicial, audit log, health checks e worker separado.
+BELEZAFOCO already has the right production backbone for a beauty SaaS: `pnpm` monorepo, Fastify API, Prisma + PostgreSQL, React + Vite frontend, multi-tenant workspaces, public booking, payment hooks, reminders, health endpoints and a combined-service deployment path.
 
-O projeto ainda não está em nível de produção comercial. O principal gap encontrado nesta etapa foi a fundação transacional: a tabela de idempotência era global por `key`, sem namespacing por escopo/tenant, e o fluxo público de booking não protegia adequadamente replays com payload divergente. Em paralelo, o caminho de deploy precisava separar `DATABASE_URL` e `DIRECT_URL` para runtime e migrations.
+The current production posture is still uneven. The most important live issue found in this pass was not only data or infra related: the published `/auth` page on `code.run` was exposing Google Sign-In while Google rejected the active origin with `400` (`The given origin is not allowed for the given client ID`). That breaks acquisition on a public flow. In parallel, `prisma-local` exposed a future Prisma CLI 7 compatibility gap around datasource config, and local API startup logs showed env loading was too dependent on the working directory.
 
-## O que foi auditado
+## Audit inputs
 
-- árvore local e espelho remoto via GitHub MCP
-- `schema.prisma`, migrations e toolchain Prisma
-- Dockerfile, envs e caminho de deploy
-- rotas de booking, payments, webhooks e tenant enforcement
-- docs oficiais atuais via Context7 e web
-- backlog e documentação viva via Linear e Notion
-- disponibilidade de Sentry, shadcn, Figma, TestSprite, Convex, Chrome DevTools e Playwright MCPs
+- local workspace tree and git state
+- GitHub MCP repository mirror and branch inventory
+- Prisma schema, migrations and package versions
+- Dockerfile, start script and env examples
+- production browser validation with Chrome DevTools and Playwright
+- official references via Context7 and web for Prisma, Northflank, Mercado Pago and WhatsApp
+- Linear backlog, Notion pages, Sentry projects/DSNs, shadcn registry, Figma diagram tooling and TestSprite attempts
 
-## Estado atual confirmado
+## Confirmed current state
 
-### Base saudável
+### Healthy foundations
 
-- `apps/api` e `apps/web` estão bem separados
-- `schema.prisma` já está em PostgreSQL e cobre workspaces, memberships, agenda, pagamentos, mensagens, waitlist e auditoria
-- `worker.ts` já separa reminders, reconciliação e cleanup
-- Sentry já está integrado em backend e frontend
-- build da API e testes atuais passam
+- PostgreSQL is already the primary datasource in `apps/api/prisma/schema.prisma`.
+- Workspaces and memberships remain the canonical tenant boundary.
+- Backend modules are split by business domain and already cover auth, booking, payments, messaging, billing and dashboard summaries.
+- The API test suite is healthy after the auth and env hardening done in this pass.
+- The Docker base image is already `node:20-bookworm-slim`, which is the correct direction for Prisma and Northflank.
 
-### Bloqueios reais para produção
+### Production blockers and risks
 
-1. Idempotência frágil
-   - `IdempotencyKey.key` era única globalmente
-   - não havia namespacing por `scope + workspace`
-   - um replay com payload diferente podia reutilizar a mesma chave
+1. Public auth was broken on the live domain.
+   - Chrome DevTools and Playwright reproduced a Google Identity Services `400`.
+   - The live page showed a real Google button even when the domain was not authorized.
+   - Form inputs also triggered accessibility issues because they lacked `id` or `name`.
 
-2. Caminho de migrations incompleto para produção
-   - o runtime usava `DATABASE_URL`, mas o deploy ainda não documentava `DIRECT_URL`
-   - sem separar conexão pooled e conexão direta, o caminho com PgBouncer/Northflank ficava frágil
+2. API env loading was brittle in the monorepo.
+   - `api-live.log` showed the API crashing without `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET`.
+   - Root-level monorepo execution was not consistently loading `.env`.
 
-3. Mercado Pago incompleto
-   - criação de Pix estava em modo mock/placeholder
-   - webhook aceitava apenas payload simplificado
-   - assinatura oficial e consulta posterior do pagamento ainda não estavam materializadas
+3. Prisma tooling is split across generations.
+   - The project runtime is still on Prisma 5.
+   - `prisma-local` runs Prisma CLI 7.4.2 and failed on `url` / `directUrl` in the datasource block.
+   - This is a tooling and upgrade-path risk, even when the application runtime still works.
 
-4. Tooling Prisma heterogêneo
-   - projeto local em Prisma `5.22`
-   - Prisma MCP da sessão em `7.x`, incompatível com o formato atual de datasource
-   - isso impacta inspeção via MCP, não o app em si
+4. Full repo build remains partially red outside the touched flow.
+   - `apps/api` has legacy type and schema drift outside auth.
+   - `apps/web` still has stale files like `AuthExperience.tsx` referencing removed APIs and missing deps.
+   - These are pre-existing debt items and were not introduced by this patch set.
 
-5. Banco local indisponível para migrations
-   - `prisma generate`, build e testes passaram
-   - `prisma migrate deploy` não pôde ser validado localmente porque o banco não estava acessível para novos processos CLI
+## Structural work delivered in this pass
 
-## Correção estrutural entregue nesta etapa
+### Production auth hardening
 
-### Idempotência endurecida
+- Added origin-aware Google Sign-In gating through `apps/api/src/modules/auth/publicAuthConfig.ts`.
+- `/auth/config` now derives the published origin from request headers and only exposes the Google client id when the current origin is allowed.
+- Added `GOOGLE_ALLOWED_ORIGINS` to the backend env contract for preview + production alignment.
+- Updated the auth UI to show the real Google status: `Ativo`, `Bloqueado`, or `Pendente`.
+- Added `id` and `name` to auth form inputs to remove the production console warning.
 
-- `IdempotencyKey` agora usa `namespaceKey` único
-- o namespace é `scope:workspaceId:key` com fallback `global`
-- o helper agora detecta conflito quando a mesma chave volta com `requestHash` diferente
-- o booking público passou a preferir replay persistido e a rejeitar reuso indevido
+### Monorepo env loading hardening
 
-### Booking público endurecido
+- Reworked `apps/api/src/config/env.ts` to search `.env` from both package and workspace-root candidates.
+- Verified from the repo root that the API can now resolve JWT secrets without leaking values.
 
-- a resposta persistida de replay agora inclui `payment` serializado quando houver Pix
-- o fluxo evita expor `rawPayload` do provider para o cliente público
-- o booking guarda a resposta final somente depois de concluir a criação do Pix
+### Test stability hardening
 
-### Fundamento de deploy Prisma/Northflank
+- Added `apps/api/tests/public-auth-config.test.ts` for origin gating coverage.
+- Fixed `apps/api/tests/idempotency.test.ts` so it no longer fails due to missing auth envs during import.
+- Current API result: `31` tests passing in `12` files.
 
-- `datasource` recebeu `directUrl`
-- o wrapper `prisma-with-env.mjs` faz fallback de `DIRECT_URL` para `DATABASE_URL`
-- `.env.example` e `northflank.env.example` foram atualizados com `DIRECT_URL` e `API_BASE_URL`
+## Live validation performed
 
-### Mercado Pago mais próximo do real
+- Production URL checked: `https://p03--belezafoco-api--fdzfclqyqq99.code.run/auth`
+- Chrome DevTools findings:
+  - Google Sign-In origin mismatch error
+  - missing `id` / `name` warning in auth fields
+  - `GET /auth/config` confirmed on the live app
+- Playwright findings:
+  - same Google origin rejection reproduced
+  - auth page structure and public content loaded correctly
 
-- o provider agora cria Pix real via `POST /v1/payments` quando `MERCADO_PAGO_ENABLED=true`
-- o webhook aceita payload oficial, verifica assinatura HMAC e busca detalhes do pagamento na API do Mercado Pago
-- o modo mock legado foi mantido para ambiente local e testes
+## External tooling findings
 
-## Validação desta etapa
+- Linear project already existed and received new urgent issues `THA-16`, `THA-17`, `THA-18`.
+- Notion already had PRD and rollout pages; two delta pages were created for this pass.
+- Sentry org `thark-s4` already has `belezafoco-api` and `belezafoco-web` projects with DSNs available for deployment wiring.
+- Superdesign CLI is installed and authenticated, but draft generation is currently blocked by insufficient team credits.
+- Convex MCP is not authorized and remains rejected as a core dependency.
+- TestSprite is only partially usable in this workspace because its expected summary/PRD artifacts are missing.
 
-- `corepack pnpm --filter @belezafoco/api prisma:generate`: aprovado
-- `corepack pnpm --filter @belezafoco/api build`: aprovado
-- `corepack pnpm --filter @belezafoco/api test`: aprovado
-- novas suites:
-  - `apps/api/tests/idempotency.test.ts`
-  - `apps/api/tests/mercadopago-provider.test.ts`
+## Remaining risks
 
-## Riscos remanescentes
+- Google Cloud Console still needs the active production domain added to Authorized JavaScript origins.
+- Prisma 7 migration compatibility remains documented but not yet implemented end-to-end.
+- Full repo typecheck/build is still red due to older debt outside the auth flow.
+- Northflank redeploy and live validation still depend on external platform access and secrets rotation.
 
-- `prisma migrate deploy` segue sem validação ponta a ponta nesta máquina por indisponibilidade do banco para novos processos
-- o frontend não pôde ser validado em servidor persistente nesta sessão, então Chrome DevTools/Playwright ficaram limitados pelo ambiente
-- WhatsApp Cloud API continua sem integração real
-- módulo financeiro ainda precisa de modelagem de ledger, comissões, AP/AR e UX própria
+## Recommended next steps
 
-## Próximos passos recomendados
-
-1. Aplicar a migration nova em um PostgreSQL acessível e validar `_prisma_migrations`.
-2. Subir o frontend em um preview estável e executar smoke/E2E com Playwright.
-3. Evoluir o design system com shadcn para dashboard, agenda, financeiro e onboarding.
-4. Implementar o módulo financeiro com ledger auditável.
-5. Fechar WhatsApp Cloud API com templates, logs e retries.
+1. Apply `GOOGLE_ALLOWED_ORIGINS`, `PUBLIC_URL` and `API_BASE_URL` consistently in Northflank.
+2. Add the live domain to Google Cloud Console and redeploy before promoting the Google acquisition flow.
+3. Triage the wider TypeScript drift in `apps/api` and stale frontend files so full builds become reliable.
+4. Decide whether to keep Prisma 5 for the next release or schedule a controlled Prisma 7 upgrade with `prisma.config.ts`.
+5. Run a fresh browser smoke pass after redeploy to confirm `/auth/config` returns `googleEnabled=true` on the intended production origin.

@@ -1,6 +1,19 @@
 import { env } from "../../config/env.js";
 import { isEmailConfigured, sendEmail } from "../../lib/mailer.js";
 
+const WHATSAPP_GRAPH_API_BASE_URL = "https://graph.facebook.com";
+
+type WhatsAppCloudApiSendResponse = {
+  messaging_product?: string;
+  contacts?: Array<{ wa_id?: string | null }>;
+  messages?: Array<{ id?: string | null }>;
+  error?: {
+    message?: string;
+    error_data?: { details?: string };
+    code?: number;
+  };
+};
+
 export type MessagePayload = {
   to: string;
   templateName: string;
@@ -8,8 +21,14 @@ export type MessagePayload = {
   variables: Record<string, string>;
 };
 
+export type MessagingProviderResponse = {
+  status: "sent" | "failed";
+  provider: string;
+  response?: string;
+};
+
 export interface MessagingProvider {
-  sendTemplate(payload: MessagePayload): Promise<{ status: "sent" | "failed"; provider: string; response?: string }>;
+  sendTemplate(payload: MessagePayload): Promise<MessagingProviderResponse>;
 }
 
 export class MockWhatsAppProvider implements MessagingProvider {
@@ -53,6 +72,104 @@ function buildEmailCopy(payload: MessagePayload) {
   };
 }
 
+function normalizePhoneNumber(value: string) {
+  return value.replace(/\D/g, "");
+}
+
+function buildTemplateComponents(variables: Record<string, string>) {
+  const parameters = Object.entries(variables)
+    .filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== "")
+    .map(([, value]) => ({
+      type: "text" as const,
+      text: String(value)
+    }));
+
+  if (!parameters.length) {
+    return undefined;
+  }
+
+  return [
+    {
+      type: "body" as const,
+      parameters
+    }
+  ];
+}
+
+async function whatsappCloudApiRequest<T>(path: string, init: RequestInit) {
+  if (!env.WHATSAPP_CLOUD_API_TOKEN || !env.WHATSAPP_CLOUD_PHONE_ID) {
+    throw new Error("WhatsApp Cloud API nao configurado");
+  }
+
+  const response = await fetch(`${WHATSAPP_GRAPH_API_BASE_URL}/${env.WHATSAPP_CLOUD_API_VERSION}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${env.WHATSAPP_CLOUD_API_TOKEN}`,
+      "Content-Type": "application/json",
+      ...(init.headers ?? {})
+    },
+    signal: AbortSignal.timeout(10_000)
+  });
+
+  const raw = await response.text();
+  const payload = raw ? (JSON.parse(raw) as WhatsAppCloudApiSendResponse) : null;
+
+  if (!response.ok) {
+    const details =
+      payload?.error?.message ??
+      payload?.error?.error_data?.details ??
+      raw ??
+      "erro desconhecido";
+    throw new Error(`WhatsApp Cloud API ${response.status}: ${details}`);
+  }
+
+  return payload as T;
+}
+
+export class WhatsAppCloudApiProvider implements MessagingProvider {
+  async sendTemplate(payload: MessagePayload) {
+    try {
+      const normalizedPhone = normalizePhoneNumber(payload.to);
+      if (!normalizedPhone) {
+        throw new Error("Numero de WhatsApp invalido");
+      }
+
+      const components = buildTemplateComponents(payload.variables);
+      const response = await whatsappCloudApiRequest<WhatsAppCloudApiSendResponse>(
+        `/${env.WHATSAPP_CLOUD_PHONE_ID}/messages`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            to: normalizedPhone,
+            type: "template",
+            template: {
+              name: payload.templateName,
+              language: { code: payload.language || "pt_BR" },
+              ...(components ? { components } : {})
+            }
+          })
+        }
+      );
+
+      return {
+        status: "sent" as const,
+        provider: "whatsapp_cloud_api",
+        response: JSON.stringify({
+          contactWaId: response.contacts?.[0]?.wa_id ?? normalizedPhone,
+          messageId: response.messages?.[0]?.id ?? null
+        })
+      };
+    } catch (error) {
+      return {
+        status: "failed" as const,
+        provider: "whatsapp_cloud_api",
+        response: error instanceof Error ? error.message : "Falha ao enviar template pelo WhatsApp"
+      };
+    }
+  }
+}
+
 export class EmailNotificationProvider implements MessagingProvider {
   async sendTemplate(payload: MessagePayload) {
     if (!payload.to || !isEmailConfigured()) {
@@ -77,7 +194,7 @@ export function buildMessagingProvider(): MessagingProvider {
   }
 
   if (env.WHATSAPP_PROVIDER === "cloud_api") {
-    return new DisabledWhatsAppProvider("WhatsApp Cloud API ainda nao foi configurado neste ambiente");
+    return new WhatsAppCloudApiProvider();
   }
 
   return new DisabledWhatsAppProvider("WhatsApp desabilitado neste ambiente");

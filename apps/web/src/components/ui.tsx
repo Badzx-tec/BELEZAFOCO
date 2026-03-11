@@ -57,6 +57,26 @@ export function Badge({
   );
 }
 
+export function SectionTitle({
+  eyebrow,
+  title,
+  description,
+  className,
+  ...props
+}: HTMLAttributes<HTMLDivElement> & {
+  eyebrow?: string;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div className={cx("space-y-2", className)} {...props}>
+      {eyebrow ? <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-400">{eyebrow}</p> : null}
+      <h2 className="text-2xl font-semibold text-slate-950">{title}</h2>
+      {description ? <p className="text-sm leading-7 text-slate-500">{description}</p> : null}
+    </div>
+  );
+}
+
 export function Button({
   className,
   children,

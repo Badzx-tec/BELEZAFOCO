@@ -10,16 +10,24 @@ export const demoPublicWorkspaceResponse = {
     timezone: "America/Sao_Paulo",
     address: "Rua das Flores, 120 - Centro",
     whatsapp: "+55 11 99999-9999",
-    contactEmail: "contato@demo.belezafoco.local",
     logoUrl: null,
-    about:
+    description:
       "Agenda premium para barbearias, saloes, nails e estetica com booking mobile-first, lembretes no WhatsApp e sinal via Pix.",
-    brandPrimary: "#111827",
-    brandAccent: "#c48b5a",
     bookingPolicy:
       "Chegue com 5 minutos de antecedencia. Cancelamentos com menos de 24 horas podem gerar taxa conforme a politica do negocio.",
-    publicBookingEnabled: true
+    brandPrimaryColor: "#111827",
+    brandAccentColor: "#c48b5a",
+    minAdvanceMinutes: 120,
+    maxAdvanceDays: 30
   },
+  businessHours: [
+    { weekday: 1, startTime: "09:00", endTime: "19:00" },
+    { weekday: 2, startTime: "09:00", endTime: "19:00" },
+    { weekday: 3, startTime: "09:00", endTime: "19:00" },
+    { weekday: 4, startTime: "09:00", endTime: "19:00" },
+    { weekday: 5, startTime: "09:00", endTime: "19:00" },
+    { weekday: 6, startTime: "09:00", endTime: "16:00" }
+  ],
   services: [
     {
       id: "service-cut",
@@ -27,9 +35,13 @@ export const demoPublicWorkspaceResponse = {
       category: "Barbearia",
       description: "Corte com acabamento completo, consultoria rapida e finalizacao premium.",
       durationMinutes: 45,
+      prepMinutes: 5,
+      finishingMinutes: 10,
+      priceType: "fixed",
       priceValue: 5500,
       featured: true,
-      depositEnabled: false
+      depositEnabled: false,
+      depositAmount: null
     },
     {
       id: "service-nail",
@@ -37,9 +49,13 @@ export const demoPublicWorkspaceResponse = {
       category: "Nail Design",
       description: "Alongamento, acabamento e brilho duradouro para agenda disputada.",
       durationMinutes: 75,
+      prepMinutes: 10,
+      finishingMinutes: 10,
+      priceType: "starts_at",
       priceValue: 9000,
       featured: true,
-      depositEnabled: true
+      depositEnabled: true,
+      depositAmount: 2000
     },
     {
       id: "service-skin",
@@ -47,26 +63,36 @@ export const demoPublicWorkspaceResponse = {
       category: "Estetica",
       description: "Sessao completa com avaliacao, extracao e mascara calmante.",
       durationMinutes: 90,
+      prepMinutes: 10,
+      finishingMinutes: 10,
+      priceType: "fixed",
       priceValue: 15000,
       featured: false,
-      depositEnabled: true
+      depositEnabled: true,
+      depositAmount: 3000
     }
   ],
   staffMembers: [
     {
       id: "staff-joao",
       name: "Joao Silva",
-      staffServices: [{ serviceId: "service-cut" }]
+      bio: "Barbeiro especialista em corte social e acabamento premium.",
+      colorHex: "#2563eb",
+      serviceIds: ["service-cut"]
     },
     {
       id: "staff-camila",
       name: "Camila Rocha",
-      staffServices: [{ serviceId: "service-nail" }]
+      bio: "Nail designer focada em alongamento recorrente e acabamento fino.",
+      colorHex: "#be185d",
+      serviceIds: ["service-nail"]
     },
     {
       id: "staff-bruna",
       name: "Bruna Costa",
-      staffServices: [{ serviceId: "service-skin" }]
+      bio: "Esteticista com agenda voltada a tratamentos faciais premium.",
+      colorHex: "#0f766e",
+      serviceIds: ["service-skin"]
     }
   ]
 } as const;
@@ -99,6 +125,8 @@ export function shouldUsePublicDemoFallback(input: { slug: string; error: unknow
   }
 
   return (
+    error.name === "PublicNotFoundError" ||
+    error.message.includes("Espaco nao encontrado") ||
     error.name === "NotFoundError" ||
     error.message.includes("No Workspace found") ||
     error.message.includes("No record was found") ||
@@ -108,17 +136,22 @@ export function shouldUsePublicDemoFallback(input: { slug: string; error: unknow
 
 export function createDemoPublicSlotsResponse(date: string, serviceId: string, staffMemberId?: string) {
   const eligibleStaff = demoPublicWorkspaceResponse.staffMembers.filter(
-    (staff) =>
-      staff.staffServices.some((service) => service.serviceId === serviceId) &&
-      (!staffMemberId || staff.id === staffMemberId)
+    (staff) => staff.serviceIds.some((candidate) => candidate === serviceId) && (!staffMemberId || staff.id === staffMemberId)
   );
-  const selectedStaff = eligibleStaff[0];
 
   return {
-    staffMemberId: selectedStaff?.id ?? staffMemberId ?? "",
-    slots: selectedStaff
-      ? (demoSlotMap[`${serviceId}:${selectedStaff.id}`] ?? []).map((time) => toIsoSlot(date, time))
-      : []
+    date,
+    staff: eligibleStaff.map((staff) => ({
+      id: staff.id,
+      name: staff.name,
+      colorHex: staff.colorHex
+    })),
+    slots: eligibleStaff.flatMap((staff) =>
+      (demoSlotMap[`${serviceId}:${staff.id}`] ?? []).map((time) => ({
+        staffMemberId: staff.id,
+        startAt: toIsoSlot(date, time)
+      }))
+    )
   };
 }
 

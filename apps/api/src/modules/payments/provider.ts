@@ -66,10 +66,10 @@ function resolvePayerEmail(payerEmail?: string) {
 
 function buildNotificationUrl() {
   try {
-    const publicUrl = new URL(env.PUBLIC_URL);
-    if (publicUrl.protocol !== "https:") return undefined;
-    if (["localhost", "127.0.0.1"].includes(publicUrl.hostname)) return undefined;
-    return new URL("/payments/webhook/mercadopago", publicUrl).toString();
+    const baseUrl = new URL(env.API_BASE_URL ?? env.PUBLIC_URL);
+    if (baseUrl.protocol !== "https:") return undefined;
+    if (["localhost", "127.0.0.1"].includes(baseUrl.hostname)) return undefined;
+    return new URL("/payments/webhook/mercadopago", baseUrl).toString();
   } catch {
     return undefined;
   }

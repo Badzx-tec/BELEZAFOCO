@@ -12,8 +12,8 @@ function atHour(date: Date, hour: number, minute = 0) {
 async function main() {
   const email = process.env.SEED_ADMIN_EMAIL ?? "admin@belezafoco.local";
   const password = process.env.SEED_ADMIN_PASSWORD ?? "12345678";
-  const workspaceName = process.env.SEED_WORKSPACE_NAME ?? "Studio Inicial";
-  const workspaceSlug = process.env.SEED_WORKSPACE_SLUG ?? "studio-inicial";
+  const workspaceName = process.env.SEED_WORKSPACE_NAME ?? "Studio Beleza Foco";
+  const workspaceSlug = process.env.SEED_WORKSPACE_SLUG ?? "demo-beleza";
   const hash = await argon2.hash(password);
 
   const user = await prisma.user.upsert({

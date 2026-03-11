@@ -40,8 +40,10 @@ export function captureRequestError(error: unknown, request?: FastifyRequest) {
   if (!sentryEnabled) return;
 
   Sentry.withScope((scope) => {
-    if (request?.userId) {
-      scope.setUser({ id: request.userId });
+    const requestUserId = typeof (request?.user as { sub?: string } | undefined)?.sub === "string" ? (request?.user as { sub?: string }).sub : null;
+
+    if (requestUserId) {
+      scope.setUser({ id: requestUserId });
     }
     if (request?.workspaceId) {
       scope.setTag("workspace_id", request.workspaceId);

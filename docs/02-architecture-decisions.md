@@ -1,133 +1,118 @@
-# Decisões de Arquitetura
+# Architecture Decisions
 
-Data base: 2026-03-10
+Date base: 2026-03-11
 
-## ADR-001: O core transacional permanece em Fastify + Prisma + PostgreSQL
+## ADR-001: Core transactions stay on Fastify + Prisma + PostgreSQL
 
-Status: adotado
+Status: adopted
 
-Motivo:
+Reason:
 
-- a base atual já suporta agenda, multi-tenant, audit log e pagamentos
-- o problema não é stack errada; é hardening de produção
-- migrar o core para Convex, MongoDB ou outro backend atrasaria entrega comercial sem benefício proporcional
+- the current stack already supports tenant-aware auth, booking, audit and payment workflows
+- the main problem is production hardening, not a stack mismatch
+- moving the core to Convex, MongoDB or another backend would slow delivery without solving the current blockers
 
-## ADR-002: `Workspace` continua sendo o tenant canônico
+## ADR-002: `Workspace` remains the canonical tenant
 
-Status: adotado
+Status: adopted
 
-Diretriz:
+Rule:
 
-- toda operação autenticada precisa resolver `workspaceId` no servidor
-- membership continua sendo a fonte de verdade para RBAC
-- ownership checks por workspace devem existir em todo lookup por ID
+- every authenticated operation must resolve `workspaceId` server-side
+- memberships stay as the RBAC source of truth
+- any lookup by resource id must continue to enforce workspace ownership
 
-## ADR-003: Convex foi rejeitado como core
+## ADR-003: Convex is rejected as a transactional core
 
-Status: adotado
+Status: adopted
 
-Decisão:
+Reason:
 
-- não usar Convex no core transacional
+- Convex MCP returned unauthorized for this workspace
+- there is no current real-time requirement strong enough to justify a second operational core
+- if used later, Convex must stay complementary only
 
-Motivo:
+## ADR-004: Northflank combined service stays the primary topology
 
-- o MCP do Convex retornou ambiente não autorizado
-- não há caso de uso de tempo real que justifique mais uma superfície operacional agora
-- se houver uso futuro, será complementar, por exemplo feed operacional ou presença
+Status: adopted
 
-## ADR-004: Idempotência agora é namespaced por escopo e tenant
+Rule:
 
-Status: adotado
+- one published service serves the compiled SPA and the Fastify API
+- reminders, reconciliation and migrations stay as separate jobs where possible
+- `RUN_MIGRATIONS_ON_START` remains a controlled fallback, not the default release path
 
-Decisão:
+Reason:
 
-- `IdempotencyKey` passa a usar `namespaceKey = scope:workspace:key`
+- the live environment is already operating in this shape
+- the official Northflank guidance for Docker services + jobs fits this model well
 
-Motivo:
+## ADR-005: Runtime and migration connections stay split
 
-- `key` única global era frágil e permitia colisão transversal
-- o booking público precisava rejeitar replays com payload divergente
+Status: adopted
 
-## ADR-005: `DIRECT_URL` é obrigatório para o caminho de produção
+Rule:
 
-Status: adotado
+- `DATABASE_URL` is the runtime connection
+- `DIRECT_URL` is reserved for migrations and direct CLI work
+- docs and env examples must keep this split explicit
 
-Decisão:
+Reason:
 
-- `DATABASE_URL` fica para runtime
-- `DIRECT_URL` fica para migrations e operações CLI
+- Prisma recommends direct connections for migrate flows, especially around poolers
 
-Motivo:
+## ADR-006: Google Sign-In is gated by the published origin
 
-- a documentação atual do Prisma recomenda conexão direta para `migrate deploy`, especialmente em ambientes com pooler/PgBouncer
-- Northflank e addons PostgreSQL pedem clareza entre runtime e migração
+Status: adopted
 
-## ADR-006: Mercado Pago segue por adapter HTTP sem SDK adicional
+Rule:
 
-Status: adotado
+- `/auth/config` must not expose an active Google Sign-In button when the current published origin is not authorized
+- the backend must derive the live origin from request headers and compare it against `GOOGLE_ALLOWED_ORIGINS`, `PUBLIC_URL`, `API_BASE_URL` and `APP_URL`
+- the frontend must surface the real operational state instead of a generic pending badge
 
-Decisão:
+Reason:
 
-- integração inicial usa `fetch` nativo contra `https://api.mercadopago.com/v1/payments`
+- production browser validation showed a real Google button failing publicly with `The given origin is not allowed for the given client ID`
+- a broken acquisition button is worse than a disabled one with an explicit operator message
 
-Motivo:
+## ADR-007: Monorepo env loading must be cwd-agnostic
 
-- mantém o runtime simples
-- evita acoplamento prematuro a um SDK sem necessidade
-- facilita log e troubleshooting do payload real
+Status: adopted
 
-## ADR-007: Webhook do Mercado Pago deve ser validado e reconciliado
+Rule:
 
-Status: adotado
+- API env loading must search both package-local and workspace-root `.env` files
+- container and platform-provided envs still win because dotenv uses `override: false`
 
-Diretriz:
+Reason:
 
-- validar assinatura HMAC quando `MP_WEBHOOK_SECRET` existir
-- tratar payload oficial e consultar detalhes do pagamento por API
-- manter compatibilidade com payload mock para ambiente local
+- local logs showed the API crashing when started from the monorepo root because JWT secrets were not loaded
 
-## ADR-008: Sentry permanece como padrão de observabilidade
+## ADR-008: Prisma 7 compatibility is tracked as a planned upgrade, not an emergency runtime migration
 
-Status: adotado
+Status: adopted
 
-Diretriz:
+Rule:
 
-- backend com `@sentry/node` e integração Prisma
-- frontend com `@sentry/react` e tracing de rotas
-- DSNs entram por ambiente, nunca em arquivo versionado
+- the current release line can stay on Prisma 5 runtime packages while the team documents the Prisma 7 datasource migration path
+- the Prisma 7 move must be done as a controlled upgrade with `prisma.config.ts` and full repo validation, not as an opportunistic hotfix
 
-## ADR-009: Playwright continua padrão de E2E
+Reason:
 
-Status: adotado
+- `prisma-local` surfaced a real compatibility gap with Prisma CLI 7.4.2
+- the live runtime issue this round was auth acquisition, not an active runtime crash caused by Prisma 5
 
-Motivo:
+## ADR-009: Mercado Pago and WhatsApp integrations stay adapter-based
 
-- cobre melhor os fluxos críticos pedidos: login, onboarding, agenda, booking público e pagamentos
-- nesta sessão o MCP de browser encontrou limitação ambiental, mas a escolha do repositório não muda
+Status: adopted
 
-## ADR-010: A direção visual premium será construída sobre shadcn + tokens locais
+Rule:
 
-Status: adotado
+- Mercado Pago continues through direct HTTP requests and secure webhook validation
+- WhatsApp Cloud API continues through provider abstraction, template mapping and webhook verification
+- credentials remain server-side only
 
-Diretriz:
+Reason:
 
-- usar primitives e padrões do ecossistema shadcn como base
-- manter tokens locais em Tailwind/CSS variables
-- não depender de hotlinks frágeis para assets finais
-
-## ADR-011: `demo-beleza` Ã© um slug reservado para demo comercial e smoke tests
-
-Status: adotado
-
-Diretriz:
-
-- `demo-beleza` pode responder com payload sintÃ©tico controlado quando `PUBLIC_DEMO_ENABLED=true`
-- o fallback existe apenas para demonstraÃ§Ã£o comercial, QA visual e smoke no Northflank
-- slugs reais continuam presos ao banco e ao fluxo transacional normal
-
-Motivo:
-
-- o ambiente publicado no Northflank pode subir sem seed demo, quebrando a vitrine comercial
-- o produto precisa continuar demonstrÃ¡vel mesmo quando o banco de staging estÃ¡ vazio ou indisponÃ­vel
-- o fallback nÃ£o interfere em tenants reais porque estÃ¡ restrito a um slug reservado
+- adapter-based integrations are easier to observe, retry and audit than opaque SDK-heavy flows in this codebase

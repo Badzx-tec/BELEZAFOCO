@@ -1,4 +1,4 @@
-import { FastifyPluginAsync } from "fastify";
+import { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { prisma } from "../../lib/prisma.js";
 import {
@@ -55,7 +55,24 @@ const googleSchema = z.object({
 });
 
 export const authRoutes: FastifyPluginAsync = async (app) => {
-  app.get("/auth/config", async () => getPublicAuthConfig());
+  const resolveRequestOrigin = (req: FastifyRequest) => {
+    const explicitOrigin = typeof req.headers.origin === "string" ? req.headers.origin : null;
+    if (explicitOrigin) {
+      return explicitOrigin;
+    }
+
+    const forwardedProto = typeof req.headers["x-forwarded-proto"] === "string" ? req.headers["x-forwarded-proto"].split(",")[0]?.trim() : null;
+    const forwardedHost = typeof req.headers["x-forwarded-host"] === "string" ? req.headers["x-forwarded-host"].split(",")[0]?.trim() : null;
+    const host = forwardedHost ?? (typeof req.headers.host === "string" ? req.headers.host : null);
+
+    if (!host) {
+      return null;
+    }
+
+    return `${forwardedProto ?? req.protocol}://${host}`;
+  };
+
+  app.get("/auth/config", async (req) => getPublicAuthConfig(resolveRequestOrigin(req)));
 
   app.post("/auth/register", async (req, reply) => {
     const body = registerSchema.parse(req.body);
@@ -144,7 +161,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.get("/auth/me", async (req) => {
-    await app.auth(req as any);
+    await app.authenticate(req as any);
     return getMe((req.user as any).sub);
   });
 };

@@ -36,7 +36,6 @@ export const waitlistRoutes: FastifyPluginAsync = async (app) => {
           id: body.staffMemberId,
           workspaceId: workspace.id,
           active: true,
-          isBookable: true,
           staffServices: {
             some: {
               serviceId: service.id

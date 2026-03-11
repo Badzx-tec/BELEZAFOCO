@@ -78,6 +78,18 @@ export function AuthPage() {
     [mode]
   );
 
+  const googleStatus = useMemo(() => {
+    if (!config?.googleConfigured) {
+      return { label: "Pendente", tone: "neutral" as const };
+    }
+
+    if (config.googleEnabled) {
+      return { label: "Ativo", tone: "success" as const };
+    }
+
+    return { label: "Bloqueado", tone: "warning" as const };
+  }, [config]);
+
   async function handleLoginSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -278,6 +290,8 @@ export function AuthPage() {
               <form className="mt-6 space-y-4" onSubmit={handleLoginSubmit}>
                 <Field label="E-mail">
                   <Input
+                    id="login-email"
+                    name="email"
                     type="email"
                     value={loginForm.email}
                     onChange={(event) => setLoginForm((current) => ({ ...current, email: event.target.value }))}
@@ -287,6 +301,8 @@ export function AuthPage() {
                 </Field>
                 <Field label="Senha">
                   <Input
+                    id="login-password"
+                    name="password"
                     type="password"
                     value={loginForm.password}
                     onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))}
@@ -313,10 +329,12 @@ export function AuthPage() {
             {mode === "register" ? (
               <form className="mt-6 grid gap-4 sm:grid-cols-2" onSubmit={handleRegisterSubmit}>
                 <Field label="Nome">
-                  <Input value={registerForm.name} onChange={(event) => setRegisterForm((current) => ({ ...current, name: event.target.value }))} />
+                  <Input id="register-name" name="name" value={registerForm.name} onChange={(event) => setRegisterForm((current) => ({ ...current, name: event.target.value }))} />
                 </Field>
                 <Field label="WhatsApp">
                   <Input
+                    id="register-whatsapp"
+                    name="whatsapp"
                     value={registerForm.whatsapp}
                     onChange={(event) => setRegisterForm((current) => ({ ...current, whatsapp: event.target.value }))}
                     placeholder="+55 11 99999-9999"
@@ -324,6 +342,8 @@ export function AuthPage() {
                 </Field>
                 <Field label="E-mail" className="sm:col-span-2">
                   <Input
+                    id="register-email"
+                    name="email"
                     type="email"
                     value={registerForm.email}
                     onChange={(event) => setRegisterForm((current) => ({ ...current, email: event.target.value }))}
@@ -332,6 +352,8 @@ export function AuthPage() {
                 </Field>
                 <Field label="Senha">
                   <Input
+                    id="register-password"
+                    name="password"
                     type="password"
                     value={registerForm.password}
                     onChange={(event) => setRegisterForm((current) => ({ ...current, password: event.target.value }))}
@@ -340,6 +362,8 @@ export function AuthPage() {
                 </Field>
                 <Field label="Nome do negocio">
                   <Input
+                    id="register-workspace-name"
+                    name="workspaceName"
                     value={registerForm.workspaceName}
                     onChange={(event) =>
                       setRegisterForm((current) => ({
@@ -353,6 +377,8 @@ export function AuthPage() {
                 </Field>
                 <Field label="Link publico" hint="slug unico" className="sm:col-span-2">
                   <Input
+                    id="register-slug"
+                    name="slug"
                     value={registerForm.slug}
                     onChange={(event) => setRegisterForm((current) => ({ ...current, slug: normalizeSlug(event.target.value) }))}
                     placeholder="studio-beleza-foco"
@@ -370,6 +396,8 @@ export function AuthPage() {
               <form className="mt-6 space-y-4" onSubmit={handleForgotSubmit}>
                 <Field label="E-mail da conta">
                   <Input
+                    id="forgot-email"
+                    name="email"
                     type="email"
                     value={forgotEmail}
                     onChange={(event) => setForgotEmail(event.target.value)}
@@ -390,7 +418,7 @@ export function AuthPage() {
                   <p className="text-sm font-semibold text-slate-900">Continuar com Google</p>
                   <p className="mt-1 text-sm leading-6 text-slate-500">Token verificado no backend e provisionamento de workspace no primeiro acesso.</p>
                 </div>
-                <Badge>{config?.googleEnabled ? "Ativo" : "Pendente"}</Badge>
+                <Badge tone={googleStatus.tone}>{googleStatus.label}</Badge>
               </div>
 
               {config?.googleEnabled && config.googleClientId ? (
@@ -419,6 +447,8 @@ export function AuthPage() {
                         </div>
                         <Field label="Nome do negocio">
                           <Input
+                            id="google-workspace-name"
+                            name="workspaceName"
                             value={googleWorkspace.workspaceName}
                             onChange={(event) =>
                               setGoogleWorkspace((current) => ({
@@ -431,12 +461,14 @@ export function AuthPage() {
                         </Field>
                         <Field label="Slug publico">
                           <Input
+                            id="google-slug"
+                            name="slug"
                             value={googleWorkspace.slug}
                             onChange={(event) => setGoogleWorkspace((current) => ({ ...current, slug: normalizeSlug(event.target.value) }))}
                           />
                         </Field>
                         <Field label="WhatsApp">
-                          <Input value={googleWorkspace.whatsapp} onChange={(event) => setGoogleWorkspace((current) => ({ ...current, whatsapp: event.target.value }))} />
+                          <Input id="google-whatsapp" name="whatsapp" value={googleWorkspace.whatsapp} onChange={(event) => setGoogleWorkspace((current) => ({ ...current, whatsapp: event.target.value }))} />
                         </Field>
                         <Button type="submit" busy={busy}>
                           Finalizar conta com Google
@@ -447,7 +479,10 @@ export function AuthPage() {
                 </GoogleOAuthProvider>
               ) : (
                 <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm leading-7 text-slate-500">
-                  Configure `GOOGLE_CLIENT_ID` no backend para liberar o botao real do Google Sign-In.
+                  <p>{config?.googleDisabledReason ?? "Configure GOOGLE_CLIENT_ID no backend para liberar o botao real do Google Sign-In."}</p>
+                  {config?.googleCurrentOrigin ? (
+                    <p className="mt-2 text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Dominio detectado: {config.googleCurrentOrigin}</p>
+                  ) : null}
                 </div>
               )}
             </div>

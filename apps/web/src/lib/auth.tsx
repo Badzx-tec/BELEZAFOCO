@@ -421,8 +421,11 @@ export function useAuth() {
 
 export async function getAuthConfig() {
   return api<{
+    googleConfigured: boolean;
     googleEnabled: boolean;
     googleClientId: string | null;
+    googleDisabledReason: string | null;
+    googleCurrentOrigin: string | null;
     emailPasswordEnabled: boolean;
     emailVerificationRequired: boolean;
   }>("/auth/config");

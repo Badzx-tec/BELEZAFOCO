@@ -11,7 +11,7 @@
     "lint": "corepack pnpm -r lint",
     "start": "node apps/api/dist/src/server.js",
     "prisma:migrate": "corepack pnpm --filter @belezafoco/api prisma:migrate",
-    "prisma:migrate:deploy": "corepack pnpm --filter @belezafoco/api exec prisma migrate deploy",
+    "prisma:migrate:deploy": "corepack pnpm --filter @belezafoco/api prisma:migrate:deploy",
     "prisma:generate": "corepack pnpm --filter @belezafoco/api prisma:generate",
     "seed": "corepack pnpm --filter @belezafoco/api seed"
   },
