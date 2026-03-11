@@ -1,18 +1,21 @@
-import type { AppRole } from "./types.js";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 
-const roleWeight: Record<AppRole, number> = {
+const roleWeight = {
   owner: 40,
   manager: 30,
   receptionist: 20,
   staff: 10
-};
+} as const;
 
-export function hasRole(role: AppRole, minimumRole: AppRole) {
-  return roleWeight[role] >= roleWeight[minimumRole];
+type RoleName = keyof typeof roleWeight;
+
+export function hasAnyRole(currentRole: string | undefined, allowedRoles: RoleName[]) {
+  if (!currentRole) return false;
+  return allowedRoles.some((role) => roleWeight[currentRole as RoleName] >= roleWeight[role]);
 }
 
-export function assertRole(role: AppRole, minimumRole: AppRole) {
-  if (!hasRole(role, minimumRole)) {
-    throw new Error("FORBIDDEN");
+export function requireRole(app: FastifyInstance, request: FastifyRequest, allowedRoles: RoleName[]) {
+  if (!hasAnyRole(request.membershipRole, allowedRoles)) {
+    throw app.httpErrors.forbidden("Sem permissão para esta ação");
   }
 }

@@ -2,138 +2,45 @@
 
 ## 2026-03-10
 
-### Hardening transacional e caminho de produção
-
-- `IdempotencyKey` passou a usar `namespaceKey` único por `scope + workspace + key`
-- helper de idempotência agora rejeita replay com payload divergente
-- booking público passou a reutilizar resposta persistida e a serializar `payment` sem expor payload bruto do provider
-- provider do Mercado Pago passou a suportar criação real de Pix via API oficial quando habilitado
-- webhook do Mercado Pago passou a aceitar payload oficial, validar assinatura HMAC e consultar o pagamento na API do provider
-- `schema.prisma` recebeu `directUrl` e o wrapper do Prisma passou a fazer fallback de `DIRECT_URL`
-- `.env.example` e `northflank.env.example` ganharam `DIRECT_URL` e `API_BASE_URL`
-- testes unitários adicionados para namespace de idempotência e assinatura/status do Mercado Pago
-- docs criados/atualizados: auditoria técnica, ADRs, Northflank deploy, security checklist, design system, MCP usage log e trilha inicial do financeiro
-
-### Deploy e staging
-
-- `Caddyfile` ajustado para usar `API_UPSTREAM` configuravel, deixando o `web` pronto para Compose e Northflank
-- `web` passou a expor probes locais em `/healthz` e `/readyz` para plataformas de deploy
-- `.env.example` e `docker-compose.yml` alinhados ao novo upstream configuravel
-- guia de deploy em Northflank adicionado em `docs/09-deploy-northflank.md`
-
-### Auditoria e operacao
-
-- auditoria tecnica e ADRs reescritas para refletir o estado real validado nesta execucao
-- backlog operacional criado no Linear em `BELEZAFOCO Production Launch` com epicos `THA-5` a `THA-10`
-- PRD curto e runbook operacional criados no Notion
-- log de uso dos MCPs criado em `docs/08-mcp-usage-log.md`
-- estrategia de testes criada em `docs/07-testing-strategy.md`
-
-### Booking engine
-
-- `AppointmentSegment` evoluido para suportar `resourceUnit`
-- migration adicionada para permitir capacidade real de recurso por horario
-- alocacao de recurso agora considera unidades disponiveis em toda a janela ocupada do atendimento
-- conflitos de booking agora usam transacao `Serializable` com retry para `P2034`
-- testes unitarios adicionados para capacidade de recurso
-
-### Runtime e ambiente local
-
-- `@fastify/sensible` atualizado para major compativel com Fastify 5
-- fallback do frontend para `API_URL` passou a inferir o host atual em dev/preview
-- `CORS_ORIGIN` default ampliado para cobrir `localhost` e `127.0.0.1` em `5173` e `4173`
-- `.env.example` alinhado ao novo fallback local e aos projetos reais do Sentry
-- validacao no navegador confirmou que o erro de CORS foi resolvido; o bloqueio restante passou a ser banco local indisponivel
+- hardened workspace scripts to use `corepack pnpm` and fixed recursive test execution for packages without unit tests
+- replaced the old Alpine Docker image with a Debian slim multi-stage image prepared for Prisma and Northflank combined-service deploys
+- exposed `/healthz` and `/readyz` and made Fastify serve the built frontend for same-origin production hosting
+- switched the frontend API client to same-origin by default
+- added local marketing and niche SVG assets plus favicon for stronger visual positioning
+- upgraded landing and public booking with richer visual sections and a production-first public flow
+- added optional env-driven Sentry initialization to backend and frontend
+- added initial Playwright smoke coverage for landing, dashboard and public booking
+- hardened the API with `@fastify/helmet`, production proxy awareness and Mercado Pago webhook signature validation helpers
+- replaced the mock-only Mercado Pago Pix provider with a real API-backed flow plus official webhook reconciliation
+- tracked `pnpm-lock.yaml` in Git so Northflank Docker builds receive a complete workspace context
+- disabled `index.html` auto-registration in `@fastify/static` to avoid duplicate `HEAD /` conflicts during production boot
+- restricted tenant auth enforcement to `/me` and `/admin` so the Northflank combined service can serve the public SPA, booking flow and static assets without `401`
+- temporarily added a public booking fallback while Northflank bootstrap was being stabilized
+- finalized the live Northflank rollout by isolating the app in PostgreSQL schema `belezafoco`, applying Prisma migrations in production and validating the public booking + Pix-style flow on the public domain
+- created production documentation set in `docs/01` through `docs/10`
+- created Linear project, PRD document and backlog issues for the productionization effort
+- replaced placeholder auth with production registration, email verification, password reset and protected dashboard sessions
+- added backend Google Sign-In verification flow, ready to activate with `GOOGLE_CLIENT_ID`
+- removed public booking fallbacks from frontend and backend so only real workspace slugs can book
+- updated seed/bootstrap defaults away from placeholder workspace slugs and marked owner seed users as verified
+- allowed Google Identity Services through the production CSP so Google Sign-In can render on the live auth page
+- allowed the Google Identity Services stylesheet through the production CSP so the sign-in button can mount cleanly
+- disabled edge caching on the SPA HTML entry so auth and app deploys do not serve stale index responses after rollout
+- changed reminder delivery defaults to fail closed in production instead of silently using mock WhatsApp delivery
+- added API Vitest serialization and refreshed Playwright smoke coverage for landing, auth and public booking failure states
+- added `RUN_MIGRATIONS_ON_START` container support as a controlled bridge until the dedicated Northflank migration job is created
+- fixed the Northflank startup migration path by shipping the Prisma CLI in the API runtime image and invoking it through `pnpm --filter @belezafoco/api exec prisma --schema prisma/schema.prisma`
+- fixed production SPA deep links for `/auth`, `/auth/verify-email` and `/auth/reset-password` so direct access works behind the combined Fastify service
 
 ## 2026-03-09
 
-### Hardening da fase 1
-
-- bootstrap de ambiente do Prisma endurecido com carregamento da `.env` raiz para `generate`, `migrate` e `seed`
-- fluxo de refresh token corrigido no backend para validar o token de refresh explicitamente, sem depender do request atual
-- validacoes de ownership multi-tenant reforcadas em servicos, equipe e fila de espera
-- artefatos `.js` residuais removidos de `apps/web/src/components`, evitando que o Vite sombreasse os `.tsx`
-- camada HTTP do frontend ajustada para tratar falha de rede, expirar sessao com seguranca e propagar mensagens melhores
-- acessibilidade do auth, dashboard e booking publico revisada com `label`, `fieldset`, `id/name`, `required` e feedback via `role=\"alert\"`
-- warnings do React Router removidos com `future` flags e UX do booking revalidada no navegador
-
-### Observabilidade
-
-- Sentry configurado na API com release, environment, traces sampler e captura segura de erros 5xx por request
-- Prisma preparado para tracing no cliente v5 com `previewFeatures = [\"tracing\"]`
-- frontend React integrado ao Sentry com tracing do React Router v6, error boundary e sincronizacao de usuario/workspace
-- build do Vite preparado para release tracking e upload opcional de sourcemaps via `@sentry/vite-plugin`
-- `.env.example`, checklist e guia de deploy atualizados com as variaveis operacionais do Sentry
-
-### Infra e worker
-
-- `worker.ts` criado com agenda recorrente para reminders, cleanup e reconciliacao, evitando sobreposicao de execucao
-- jobs de reminders, cleanup e pagamentos refatorados para funcoes reutilizaveis e execucao isolada
-- `Dockerfile` refeito com targets `api`, `worker` e `web`
-- `docker-compose.yml` refeito para stack com `postgres`, `redis`, `api`, `worker` e `web`
-- `Caddyfile` refeito para SPA estatico com proxy de `/api/*` para a API
-- `.dockerignore` criado e `.env.example` ampliado com overrides especificos de Docker
-
-### Frontend core
-
-- `@tanstack/react-query`, `react-hook-form`, `@hookform/resolvers` e `zod` adicionados ao frontend
-- `QueryClientProvider` criado com politica basica de retry/cache para a camada HTTP
-- auth migrado para React Hook Form + Zod + mutation assíncrona
-- booking publico migrado para React Hook Form + Zod + queries de workspace/slots + mutation de reserva
-- primitives `Input`, `TextArea` e `Select` convertidos para `forwardRef` para compatibilidade com RHF
-
-### Auditoria e documentacao
-
-- auditoria tecnica reescrita com base em leitura do repositorio, validacao de build/teste, Chrome DevTools e pesquisa web atual
-- decisoes arquiteturais formalizadas para manter Fastify + Prisma + PostgreSQL + React e profissionalizar a base
-- checklist de producao criado em `docs/03-production-checklist.md`
-- guia inicial de deploy alvo na DigitalOcean criado em `docs/04-deploy-digitalocean.md`
-- estrategia de integracoes reais para WhatsApp Cloud API e Mercado Pago criada em `docs/05-integrations-whatsapp-mercadopago.md`
-- posicionamento comercial refeito em `docs/06-sales-positioning.md`
-- README alinhado aos documentos exigidos nesta fase
-
-## 2026-03-08
-
-### Arquitetura
-
-- auditoria tecnica criada em `docs/01-technical-audit.md`
-- decisao arquitetural formalizada para manter Fastify/Prisma/React e migrar o core para PostgreSQL
-
-### Backend
-
-- `schema.prisma` refeito para producao com PostgreSQL
-- migracao inicial gerada em `apps/api/prisma/migrations/20260308154000_production_foundation`
-- refresh token persistido e revogavel
-- middleware de tenant reforcado
-- dashboard multi-tenant com checklist e metricas
-- booking publico com idempotencia
-- segmentos de agenda para prevencao de conflito
-- webhook de pagamento endurecido
-- jobs de reminders, reconciliacao e cleanup atualizados
-
-### Frontend
-
-- landing comercial nova
-- cockpit autenticado com onboarding e operacao
-- booking publico premium em etapas
-- design system minimo com componentes reutilizaveis
-- identidade visual refeita
-
-### Operacao
-
-- `.env.example` atualizado
-- `docker-compose.yml` atualizado com PostgreSQL, Redis e Mailhog
-- `Dockerfile` atualizado para build do monorepo
-- documentacao de deploy, roadmap e posicionamento comercial criada
-
-### Testes e build
-
-- build do backend validado
-- testes do backend validados
-- build do frontend validado
-- teste utilitario inicial do frontend validado
-
-### Demo e staging
-
-- `demo-beleza` virou slug reservado de demo e smoke com fallback sintÃ©tico controlado para Northflank e QA visual
-- `.env.example` e `northflank.env.example` ganharam `PUBLIC_DEMO_ENABLED`
+- documentada a auditoria tecnica do repositorio
+- definida a arquitetura alvo preservando Fastify + Prisma + React e migrando o core para PostgreSQL
+- migrado o schema Prisma para PostgreSQL com migration baseline versionada
+- adicionados onboarding/workspace reforcado, calendario com bloqueios e dashboard summary no backend
+- adicionados refresh token persistido, RBAC explicito, webhook idempotente e booking publico com lock transacional
+- atualizado seed operacional com servicos, equipe, agenda, bloqueio e pagamento pendente
+- refeitas landing page, dashboard e pagina publica de agendamento com UX premium em pt-BR
+- atualizados `README`, `DEPLOY_DIGITALOCEAN.md`, `docker-compose.yml` e scripts de backup/restore PostgreSQL
+- removido o acoplamento com `@fastify/sensible` para compatibilizar o runtime com Fastify 5
+- corrigidos os caminhos reais de `start` e jobs para `dist/src/...` no build TypeScript

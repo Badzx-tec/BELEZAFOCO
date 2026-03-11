@@ -3,16 +3,19 @@
   "private": true,
   "version": "1.0.0",
   "packageManager": "pnpm@9.12.1",
-  "devDependencies": {
-    "@types/node": "^24.3.0"
-  },
   "scripts": {
     "build": "corepack pnpm -r build",
     "dev": "corepack pnpm --parallel --filter @belezafoco/api --filter @belezafoco/web dev",
     "test": "corepack pnpm -r test",
+    "test:e2e": "playwright test",
     "lint": "corepack pnpm -r lint",
+    "start": "node apps/api/dist/src/server.js",
     "prisma:migrate": "corepack pnpm --filter @belezafoco/api prisma:migrate",
+    "prisma:migrate:deploy": "corepack pnpm --filter @belezafoco/api exec prisma migrate deploy",
     "prisma:generate": "corepack pnpm --filter @belezafoco/api prisma:generate",
     "seed": "corepack pnpm --filter @belezafoco/api seed"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0"
   }
 }

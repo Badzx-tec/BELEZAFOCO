@@ -5,8 +5,11 @@ dist
 *.db
 *.db-*
 coverage
+playwright-report
+test-results
 apps/api/prisma/dev.db
 apps/api/prisma/dev.db-*
+*.tsbuildinfo
+.run-*.log
+.local-*.log
 .DS_Store
-*.log
-*-dev.log

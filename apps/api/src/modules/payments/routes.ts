@@ -1,204 +1,204 @@
-import { FastifyPluginAsync, FastifyInstance, FastifyRequest } from "fastify";
-import { Prisma } from "@prisma/client";
+import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { prisma } from "../../lib/prisma.js";
 import { env } from "../../config/env.js";
-import { MercadoPagoProvider, mapMercadoPagoStatus, normalizeMercadoPagoNotification, verifyMercadoPagoWebhookSignature } from "./provider.js";
+import { prisma } from "../../lib/prisma.js";
+import { MercadoPagoProvider, type NormalizedPaymentStatus } from "./provider.js";
+import { verifyMercadoPagoWebhookSignature, verifySharedWebhookSecret } from "./webhook-security.js";
 
-const mockWebhookSchema = z.object({
-  eventId: z.string().min(4),
-  externalId: z.string(),
-  status: z.enum(["paid", "failed", "expired"]),
-  appointmentId: z.string().optional()
-});
+function normalizeIncomingStatus(status?: string | null): NormalizedPaymentStatus {
+  switch (status) {
+    case "approved":
+    case "paid":
+      return "paid" as const;
+    case "refunded":
+      return "refunded" as const;
+    case "failed":
+    case "cancelled":
+    case "rejected":
+      return "failed" as const;
+    default:
+      return "pending" as const;
+  }
+}
 
 export const paymentRoutes: FastifyPluginAsync = async (app) => {
-  app.post("/payments/webhook/mercadopago", async (req) => {
-    const parsedMockPayload = mockWebhookSchema.safeParse(req.body);
-    if (parsedMockPayload.success) {
-      return applyMockWebhook(app, req, parsedMockPayload.data);
-    }
-
-    const normalizedNotification = normalizeMercadoPagoNotification({
-      body: (req.body as Record<string, unknown>) ?? {},
-      query: (req.query as Record<string, unknown>) ?? {}
-    });
-
-    if (!normalizedNotification) {
-      throw app.httpErrors.badRequest("Payload de webhook do Mercado Pago invalido.");
-    }
-
-    const signatureHeader = typeof req.headers["x-signature"] === "string" ? req.headers["x-signature"] : undefined;
-    const requestIdHeader = typeof req.headers["x-request-id"] === "string" ? req.headers["x-request-id"] : undefined;
-    if (
-      !verifyMercadoPagoWebhookSignature({
-        dataId: normalizedNotification.dataId,
-        signatureHeader,
-        requestIdHeader,
-        secret: env.MP_WEBHOOK_SECRET
+  app.post("/payments/webhook/mercadopago", async (req, reply) => {
+    const query = z
+      .object({
+        "data.id": z.string().optional(),
+        type: z.string().optional()
       })
-    ) {
-      throw app.httpErrors.unauthorized("Assinatura do webhook do Mercado Pago invalida.");
+      .passthrough()
+      .parse(req.query ?? {});
+
+    const body = z
+      .object({
+        id: z.union([z.string(), z.number()]).transform(String).optional(),
+        eventId: z.string().optional(),
+        externalId: z.string().optional(),
+        status: z.string().optional(),
+        action: z.string().optional(),
+        type: z.string().optional(),
+        data: z
+          .object({
+            id: z.union([z.string(), z.number()]).transform(String).optional()
+          })
+          .optional()
+      })
+      .passthrough()
+      .parse(req.body);
+
+    const notificationDataId = query["data.id"] ?? body.data?.id ?? body.externalId;
+    const hasOfficialSignature = typeof req.headers["x-signature"] === "string";
+
+    const isMercadoPagoSignatureValid = hasOfficialSignature
+      ? verifyMercadoPagoWebhookSignature({
+          secret: env.MP_WEBHOOK_SECRET,
+          signatureHeader: req.headers["x-signature"],
+          requestIdHeader: req.headers["x-request-id"],
+          dataId: notificationDataId
+        })
+      : false;
+    const isFallbackSecretValid = !hasOfficialSignature
+      ? verifySharedWebhookSecret({
+          expectedSecret: env.MP_WEBHOOK_SECRET,
+          providedSecret: req.headers["x-webhook-secret"]
+        })
+      : false;
+
+    if (env.MP_WEBHOOK_SECRET && !isMercadoPagoSignatureValid && !isFallbackSecretValid) {
+      throw app.httpErrors.forbidden("Webhook invalido");
     }
 
-    const existingEvent = await prisma.webhookEvent.findUnique({
-      where: {
-        provider_eventType_externalId: {
-          provider: "mercado_pago",
-          eventType: normalizedNotification.action ?? "payment.updated",
-          externalId: normalizedNotification.dataId
+    let paymentSnapshot:
+      | {
+          externalId: string;
+          status: "pending" | "paid" | "failed" | "refunded";
+          statusDetail?: string | null;
+          qrCode: string;
+          pixCopyPaste: string;
+          expiresAt?: Date | null;
+          providerPayload?: string | null;
         }
-      }
-    });
+      | null = null;
 
-    if (existingEvent) {
-      return { ok: true, duplicated: true };
+    if (body.externalId && body.status) {
+      paymentSnapshot = {
+        externalId: body.externalId,
+        status: normalizeIncomingStatus(body.status),
+        statusDetail: body.status,
+        qrCode: "",
+        pixCopyPaste: "",
+        expiresAt: null,
+        providerPayload: JSON.stringify({
+          query,
+          body
+        })
+      };
+    } else if (notificationDataId) {
+      const provider = new MercadoPagoProvider();
+      const remotePayment = await provider.getPayment(notificationDataId);
+      paymentSnapshot = {
+        externalId: remotePayment.externalId,
+        status: remotePayment.status,
+        statusDetail: remotePayment.statusDetail,
+        qrCode: remotePayment.qrCode,
+        pixCopyPaste: remotePayment.pixCopyPaste,
+        expiresAt: remotePayment.expiresAt,
+        providerPayload: remotePayment.providerPayload
+      };
     }
 
-    const provider = new MercadoPagoProvider();
-    const details = await provider.getPaymentDetails(normalizedNotification.dataId);
-    const mappedStatus = mapMercadoPagoStatus(details.status);
-    const payment = await prisma.payment.findFirstOrThrow({
-      where: {
-        externalId: String(details.id)
-      },
-      include: {
-        appointment: true
-      }
-    });
+    if (!paymentSnapshot?.externalId) {
+      throw app.httpErrors.badRequest("externalId ausente");
+    }
 
-    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      await tx.webhookEvent.create({
+    const eventId =
+      typeof req.headers["x-webhook-id"] === "string"
+        ? req.headers["x-webhook-id"]
+        : typeof req.headers["x-request-id"] === "string"
+          ? req.headers["x-request-id"]
+          : body.eventId ?? body.id ?? `${paymentSnapshot.externalId}:${paymentSnapshot.status}`;
+
+    try {
+      await prisma.webhookEvent.create({
         data: {
-          workspaceId: payment.appointment.workspaceId,
           provider: "mercado_pago",
-          eventType: normalizedNotification.action ?? "payment.updated",
-          externalId: normalizedNotification.dataId,
-          signature: signatureHeader,
-          payload: req.body as never,
-          processedAt: new Date()
+          eventId,
+          status: "received",
+          payload: JSON.stringify({
+            query,
+            body,
+            paymentSnapshot
+          })
         }
       });
+    } catch {
+      reply.code(200);
+      return { ok: true, duplicate: true };
+    }
 
+    const payment = await prisma.payment.findFirstOrThrow({
+      where: { externalId: paymentSnapshot.externalId },
+      include: { appointment: true }
+    });
+
+    await prisma.$transaction(async (tx) => {
       await tx.payment.update({
         where: { id: payment.id },
         data: {
-          status: mappedStatus,
-          paidAt: mappedStatus === "paid" ? new Date() : null,
-          providerPayload: details as never
+          status: paymentSnapshot.status,
+          qrCode: paymentSnapshot.qrCode || payment.qrCode,
+          pixCopyPaste: paymentSnapshot.pixCopyPaste || payment.pixCopyPaste,
+          expiresAt: paymentSnapshot.expiresAt ?? payment.expiresAt,
+          confirmedAt: paymentSnapshot.status === "paid" ? new Date() : payment.confirmedAt,
+          providerPayload: paymentSnapshot.providerPayload ?? JSON.stringify({ query, body })
         }
       });
 
-      if (mappedStatus === "paid") {
+      if (paymentSnapshot.status === "paid") {
         await tx.appointment.update({
           where: { id: payment.appointmentId },
           data: {
             status: "confirmed",
             depositStatus: "paid",
-            confirmedAt: new Date()
+            confirmedAt: payment.appointment.confirmedAt ?? new Date(),
+            cancelledAt: null
           }
         });
-      }
-
-      if (mappedStatus === "expired" || mappedStatus === "cancelled") {
+      } else if (paymentSnapshot.status === "pending") {
         await tx.appointment.update({
           where: { id: payment.appointmentId },
           data: {
-            status: "cancelled",
-            depositStatus: mappedStatus,
-            cancelledAt: new Date(),
-            cancelledReason: "Pagamento PIX expirado ou cancelado"
+            status: "pending_payment",
+            depositStatus: "pending",
+            paymentExpiresAt: paymentSnapshot.expiresAt ?? payment.appointment.paymentExpiresAt
           }
         });
-        await tx.appointmentSegment.deleteMany({
-          where: { appointmentId: payment.appointmentId }
+      } else if (paymentSnapshot.status === "failed") {
+        await tx.appointment.update({
+          where: { id: payment.appointmentId },
+          data: {
+            status: payment.appointment.status === "pending_payment" ? "cancelled" : payment.appointment.status,
+            depositStatus: "failed",
+            cancelledAt: payment.appointment.status === "pending_payment" ? new Date() : payment.appointment.cancelledAt
+          }
+        });
+      } else {
+        await tx.appointment.update({
+          where: { id: payment.appointmentId },
+          data: {
+            depositStatus: "refunded"
+          }
         });
       }
+
+      await tx.webhookEvent.update({
+        where: { provider_eventId: { provider: "mercado_pago", eventId } },
+        data: { status: "processed" }
+      });
     });
 
-    return { ok: true, providerStatus: details.status, status: mappedStatus };
+    return { ok: true };
   });
 };
-
-async function applyMockWebhook(
-  app: FastifyInstance,
-  req: FastifyRequest,
-  body: z.infer<typeof mockWebhookSchema>
-) {
-  if (env.MP_WEBHOOK_SECRET) {
-    const providedSecret = req.headers["x-webhook-secret"];
-    if (providedSecret !== env.MP_WEBHOOK_SECRET) {
-      throw app.httpErrors.unauthorized("Webhook nao autorizado.");
-    }
-  }
-
-  const existingEvent = await prisma.webhookEvent.findUnique({
-    where: {
-      provider_eventType_externalId: {
-        provider: "mercado_pago",
-        eventType: body.status,
-        externalId: body.eventId
-      }
-    }
-  });
-
-  if (existingEvent) {
-    return { ok: true, duplicated: true };
-  }
-
-  const payment = await prisma.payment.findFirstOrThrow({
-    where: { externalId: body.externalId },
-    include: { appointment: true }
-  });
-
-  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    await tx.webhookEvent.create({
-      data: {
-        workspaceId: payment.appointment.workspaceId,
-        provider: "mercado_pago",
-        eventType: body.status,
-        externalId: body.eventId,
-        signature: typeof req.headers["x-webhook-secret"] === "string" ? req.headers["x-webhook-secret"] : undefined,
-        payload: body as never,
-        processedAt: new Date()
-      }
-    });
-
-    await tx.payment.update({
-      where: { id: payment.id },
-      data: {
-        status: body.status,
-        paidAt: body.status === "paid" ? new Date() : null,
-        providerPayload: body as never
-      }
-    });
-
-    if (body.status === "paid") {
-      await tx.appointment.update({
-        where: { id: payment.appointmentId },
-        data: {
-          status: "confirmed",
-          depositStatus: "paid",
-          confirmedAt: new Date()
-        }
-      });
-    }
-
-    if (body.status === "expired") {
-      await tx.appointment.update({
-        where: { id: payment.appointmentId },
-        data: {
-          status: "cancelled",
-          depositStatus: "expired",
-          cancelledAt: new Date(),
-          cancelledReason: "Pagamento PIX expirado"
-        }
-      });
-      await tx.appointmentSegment.deleteMany({
-        where: { appointmentId: payment.appointmentId }
-      });
-    }
-  });
-
-  return { ok: true };
-}

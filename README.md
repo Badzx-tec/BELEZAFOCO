@@ -1,55 +1,56 @@
 # BELEZAFOCO
 
-SaaS multi-tenant para barbearias, saloes, nail designers, esteticas e negocios de beleza.
+SaaS multi-tenant para barbearias, salões, nail designers, estéticas e negócios locais de beleza.
 
-## Stack atual
+## Stack
 
-- Backend: Node 20 + TypeScript + Fastify + Prisma
+- Backend: Node 20 + TypeScript + Fastify + Prisma + Zod + JWT
 - Frontend: React + Vite + Tailwind
 - Banco principal: PostgreSQL
-- Suporte operacional: Redis
-- Jobs atuais: scripts Node para reminders, reconciliacao e cleanup
+- Observabilidade: Sentry opcional por ambiente
+- Jobs: comandos Node agendados por cron/systemd timer
 
-## Estado atual
+## Núcleo do produto
 
-A base atual tem bons sinais de direcao, mas a auditoria de 2026-03-09 concluiu que o produto ainda nao esta pronto para producao real. Os documentos abaixo registram o estado do repositorio, a decisao arquitetural final e o plano de hardening para levar o projeto a um SaaS vendavel.
+- Multi-tenant por workspace com memberships e papéis
+- Onboarding do negócio com branding, horários e checklist
+- Agenda pública por slug com UX premium
+- Serviços com buffers, preparo, finalização e política de sinal
+- Profissionais, recursos compartilhados, exceções e bloqueios
+- Scheduler com prevenção de conflito e locking transacional
+- Lembretes 24h/2h com deduplicação
+- Pagamento Pix com provider abstraído e webhook endurecido
+- Billing do SaaS com trial/basic/pro
+- Audit log, `health`, `ready`, rate limiting e logs estruturados
 
-## Subindo o projeto localmente
-
-1. Copie `.env.example` para `.env`
-2. Suba a infraestrutura:
+## Rodando local
 
 ```bash
-docker compose up -d
-```
-
-3. Instale dependencias:
-
-```bash
+cp .env.example .env
+docker compose up -d postgres mailhog
 corepack pnpm install
+corepack pnpm prisma:generate
+corepack pnpm prisma:migrate
+corepack pnpm seed
+corepack pnpm dev
 ```
 
-4. Gere o Prisma Client:
+API em `http://localhost:3333` e front em `http://localhost:5173`.
+
+## Build e testes
 
 ```bash
-corepack pnpm --filter @belezafoco/api prisma:generate
+corepack pnpm build
+corepack pnpm test
+corepack pnpm test:e2e
 ```
 
-5. Rode build e testes:
+Os smoke tests E2E usam o booking demo em `/b/demo-beleza`, entao a camada visual pode ser validada mesmo sem backend local.
+
+## Jobs
 
 ```bash
-corepack pnpm -r build
-corepack pnpm -r test
+node apps/api/dist/src/jobs/sendReminders.js
+node apps/api/dist/src/jobs/reconcilePayments.js
+node apps/api/dist/src/jobs/cleanup.js
 ```
-
-## Documentacao principal
-
-- `docs/01-technical-audit.md`
-- `docs/02-architecture-decisions.md`
-- `docs/03-production-checklist.md`
-- `docs/04-deploy-digitalocean.md`
-- `docs/05-integrations-whatsapp-mercadopago.md`
-- `docs/06-sales-positioning.md`
-- `docs/07-testing-strategy.md`
-- `docs/08-mcp-usage-log.md`
-- `docs/09-deploy-northflank.md`

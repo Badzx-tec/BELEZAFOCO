@@ -1,131 +1,104 @@
 import { FastifyPluginAsync } from "fastify";
-import { endOfDay, endOfMonth, startOfDay, startOfMonth } from "date-fns";
+import { endOfDay, startOfDay, startOfMonth } from "date-fns";
 import { prisma } from "../../lib/prisma.js";
-import { env } from "../../config/env.js";
+import { requireRole } from "../../lib/permissions.js";
+
+function sumPrice(appointments: Array<{ service: { priceValue: number | null } }>) {
+  return appointments.reduce((total, item) => total + (item.service.priceValue ?? 0), 0);
+}
 
 export const dashboardRoutes: FastifyPluginAsync = async (app) => {
-  app.get("/me/dashboard", async (req) => {
+  app.get("/me/dashboard/summary", async (req) => {
+    requireRole(app, req, ["staff"]);
+
     const now = new Date();
     const todayStart = startOfDay(now);
     const todayEnd = endOfDay(now);
     const monthStart = startOfMonth(now);
-    const monthEnd = endOfMonth(now);
 
-    const [workspace, subscription, todayAppointments, monthAppointments, serviceCount, staffCount, clientCount, templatesCount] = await Promise.all([
-      prisma.workspace.findUniqueOrThrow({ where: { id: req.workspaceId } }),
-      prisma.workspaceSubscription.findUniqueOrThrow({ where: { workspaceId: req.workspaceId } }),
+    const [appointments, clients, businessHours, activeStaff] = await Promise.all([
       prisma.appointment.findMany({
-        where: {
-          workspaceId: req.workspaceId,
-          startAt: { gte: todayStart, lte: todayEnd }
-        },
-        include: {
-          service: true,
-          staffMember: true,
-          client: true
-        },
+        where: { workspaceId: req.workspaceId, startAt: { gte: monthStart } },
+        include: { service: true, staffMember: true, client: true },
         orderBy: { startAt: "asc" }
       }),
-      prisma.appointment.findMany({
-        where: {
-          workspaceId: req.workspaceId,
-          startAt: { gte: monthStart, lte: monthEnd }
-        },
-        include: {
-          service: true,
-          staffMember: true
-        }
+      prisma.client.findMany({
+        where: { workspaceId: req.workspaceId },
+        include: { appointments: true },
+        orderBy: { createdAt: "desc" }
       }),
-      prisma.service.count({ where: { workspaceId: req.workspaceId, active: true } }),
-      prisma.staffMember.count({ where: { workspaceId: req.workspaceId, active: true } }),
-      prisma.client.count({ where: { workspaceId: req.workspaceId } }),
-      prisma.messageTemplate.count({ where: { workspaceId: req.workspaceId, active: true } })
+      prisma.businessHour.findMany({ where: { workspaceId: req.workspaceId } }),
+      prisma.staffMember.count({ where: { workspaceId: req.workspaceId, active: true } })
     ]);
 
-    const confirmedMonth = monthAppointments.filter((appointment) => ["confirmed", "done"].includes(appointment.status));
-    const noShowMonth = monthAppointments.filter((appointment) => appointment.status === "no_show").length;
-    const cancelledMonth = monthAppointments.filter((appointment) => ["cancelled", "late_cancel"].includes(appointment.status)).length;
-    const revenueConfirmed = confirmedMonth.reduce((sum, appointment) => sum + (appointment.priceAmount ?? appointment.service.priceValue ?? 0), 0);
-    const revenuePipeline = monthAppointments
-      .filter((appointment) => ["confirmed", "pending_payment"].includes(appointment.status))
-      .reduce((sum, appointment) => sum + (appointment.priceAmount ?? appointment.service.priceValue ?? 0), 0);
+    const todayAppointments = appointments.filter((item) => item.startAt >= todayStart && item.startAt <= todayEnd);
+    const upcoming = todayAppointments.filter((item) => item.status !== "cancelled");
+    const cancelled = appointments.filter((item) => item.status === "cancelled" || item.status === "late_cancel");
+    const noShows = appointments.filter((item) => item.status === "no_show");
+    const confirmedRevenue = sumPrice(appointments.filter((item) => item.status === "confirmed" || item.status === "done"));
+    const predictedRevenue = sumPrice(appointments.filter((item) => item.status !== "cancelled"));
+    const newClients = clients.filter((item) => item.createdAt >= monthStart).length;
+    const recurringClients = clients.filter((item) => item.appointments.length >= 2).length;
 
-    const topServices = aggregateTop(monthAppointments.map((appointment) => appointment.service.name));
-    const topStaff = aggregateTop(monthAppointments.map((appointment) => appointment.staffMember.name));
+    const dailyCapacityMinutes =
+      businessHours.reduce((total, item) => {
+        const [startHour, startMinute] = item.startTime.split(":").map(Number);
+        const [endHour, endMinute] = item.endTime.split(":").map(Number);
+        return total + (endHour * 60 + endMinute - (startHour * 60 + startMinute));
+      }, 0) * Math.max(activeStaff, 1);
 
-    const checklist = [
-      {
-        key: "workspace_profile",
-        label: "Identidade do negocio",
-        done: Boolean(workspace.address && workspace.whatsapp && workspace.about)
-      },
-      {
-        key: "business_hours",
-        label: "Horarios de funcionamento",
-        done: (await prisma.businessHour.count({ where: { workspaceId: req.workspaceId, isClosed: false } })) >= 5
-      },
-      {
-        key: "service_catalog",
-        label: "Catalogo de servicos",
-        done: serviceCount > 0
-      },
-      {
-        key: "team_setup",
-        label: "Equipe",
-        done: staffCount > 0
-      },
-      {
-        key: "public_booking",
-        label: "Pagina publica",
-        done: workspace.publicBookingEnabled && templatesCount > 0
-      }
-    ];
+    const bookedMinutesToday = todayAppointments.reduce((total, item) => total + (item.service.durationMinutes ?? 0), 0);
+    const occupancyRate = dailyCapacityMinutes > 0 ? Math.round((bookedMinutesToday / dailyCapacityMinutes) * 100) : 0;
 
-    const occupancyRate = staffCount === 0 ? 0 : Math.min(100, Math.round((todayAppointments.filter((appointment) => appointment.status !== "cancelled").length / Math.max(staffCount * 8, 1)) * 100));
+    const topServices = Object.values(
+      appointments.reduce<Record<string, { serviceId: string; name: string; count: number }>>((acc, item) => {
+        const key = item.serviceId;
+        if (!acc[key]) acc[key] = { serviceId: item.serviceId, name: item.service.name, count: 0 };
+        acc[key].count += 1;
+        return acc;
+      }, {})
+    )
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    const topStaff = Object.values(
+      appointments.reduce<Record<string, { staffMemberId: string; name: string; count: number }>>((acc, item) => {
+        const key = item.staffMemberId;
+        if (!acc[key]) acc[key] = { staffMemberId: item.staffMemberId, name: item.staffMember.name, count: 0 };
+        acc[key].count += 1;
+        return acc;
+      }, {})
+    )
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
 
     return {
-      workspace: {
-        id: workspace.id,
-        name: workspace.name,
-        slug: workspace.slug,
-        publicUrl: `${env.PUBLIC_URL}/b/${workspace.slug}`,
-        onboardingStep: workspace.onboardingStep,
-        onboardingCompletedAt: workspace.onboardingCompletedAt
+      today: {
+        appointments: upcoming.length,
+        confirmed: todayAppointments.filter((item) => item.status === "confirmed").length,
+        pendingPayment: todayAppointments.filter((item) => item.status === "pending_payment").length,
+        occupancyRate
       },
-      subscription,
-      checklist,
-      summary: {
-        appointmentsToday: todayAppointments.length,
-        confirmedToday: todayAppointments.filter((appointment) => appointment.status === "confirmed").length,
-        noShowsMonth: noShowMonth,
-        cancelledMonth,
-        occupancyRate,
-        serviceCount,
-        staffCount,
-        clientCount,
-        revenuePipeline,
-        revenueConfirmed
+      funnel: {
+        cancelled: cancelled.length,
+        noShows: noShows.length,
+        newClients,
+        recurringClients
       },
-      upcoming: todayAppointments.slice(0, 8).map((appointment) => ({
-        id: appointment.id,
-        clientName: appointment.client.name,
-        serviceName: appointment.service.name,
-        staffName: appointment.staffMember.name,
-        status: appointment.status,
-        startAt: appointment.startAt.toISOString()
+      revenue: {
+        predicted: predictedRevenue,
+        confirmed: confirmedRevenue
+      },
+      upcoming: upcoming.slice(0, 8).map((item) => ({
+        id: item.id,
+        startAt: item.startAt,
+        status: item.status,
+        clientName: item.client.name,
+        serviceName: item.service.name,
+        staffName: item.staffMember.name
       })),
       topServices,
       topStaff
     };
   });
 };
-
-function aggregateTop(items: string[]) {
-  return Object.entries(items.reduce<Record<string, number>>((acc, item) => {
-    acc[item] = (acc[item] ?? 0) + 1;
-    return acc;
-  }, {}))
-    .map(([label, value]) => ({ label, value }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 5);
-}

@@ -1,52 +1,52 @@
 import fp from "fastify-plugin";
 import { prisma } from "../lib/prisma.js";
-import type { AppRole } from "../lib/types.js";
-
-const publicPrefixes = ["/auth", "/public", "/payments/webhook", "/health", "/ready"];
 
 export default fp(async (app) => {
   app.decorateRequest("workspaceId", "");
-  app.decorateRequest("membershipRole", "staff");
-  app.decorateRequest("userId", "");
+  app.decorateRequest("membershipRole", "");
 
   app.addHook("preHandler", async (req, reply) => {
-    if (publicPrefixes.some((prefix) => req.url.startsWith(prefix))) {
+    const isWorkspaceRoute = req.url === "/me" || req.url.startsWith("/me/");
+    const isAdminRoute = req.url === "/admin" || req.url.startsWith("/admin/");
+
+    // The combined Northflank service also serves the SPA and static assets.
+    // Only API namespaces that carry tenant data should require auth here.
+    if (!isWorkspaceRoute && !isAdminRoute) return;
+
+    if (!req.headers.authorization) {
+      reply.code(401).send({ message: "Autenticacao obrigatoria" });
       return;
     }
 
-    await app.authenticate(req as never);
+    await app.auth(req as any);
 
-    const workspaceId = (req.headers["x-workspace-id"] as string | undefined) ?? (req.user as any).workspaceId;
-    if (!workspaceId) {
-      reply.code(400).send({ message: "Header x-workspace-id obrigatorio." });
+    if (isAdminRoute) return;
+
+    const userId = (req.user as any).sub;
+    const headerWorkspaceId = req.headers["x-workspace-id"] as string | undefined;
+
+    if (!headerWorkspaceId) {
+      reply.code(400).send({ message: "x-workspace-id header obrigatorio" });
       return;
     }
 
-    const userId = (req.user as any).sub as string;
     const membership = await prisma.membership.findUnique({
-      where: {
-        userId_workspaceId: {
-          userId,
-          workspaceId
-        }
-      }
+      where: { userId_workspaceId: { userId, workspaceId: headerWorkspaceId } }
     });
 
     if (!membership) {
-      reply.code(403).send({ message: "Acesso negado ao workspace informado." });
+      reply.code(403).send({ message: "Acesso negado" });
       return;
     }
 
-    req.userId = userId;
-    req.workspaceId = workspaceId;
-    req.membershipRole = membership.role as AppRole;
+    req.workspaceId = headerWorkspaceId;
+    req.membershipRole = membership.role;
   });
 });
 
 declare module "fastify" {
   interface FastifyRequest {
     workspaceId: string;
-    membershipRole: AppRole;
-    userId: string;
+    membershipRole: string;
   }
 }

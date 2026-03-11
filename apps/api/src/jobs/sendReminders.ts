@@ -1,104 +1,79 @@
 import { addHours, addMinutes, isWithinInterval } from "date-fns";
-import { pathToFileURL } from "node:url";
+import { env } from "../config/env.js";
 import { prisma } from "../lib/prisma.js";
-import { EmailFallbackProvider, MockWhatsAppProvider } from "../modules/messaging/provider.js";
+import { EmailNotificationProvider, buildMessagingProvider } from "../modules/messaging/provider.js";
 
-export async function runSendRemindersJob(now = new Date()) {
-  const provider = new MockWhatsAppProvider();
-  const email = new EmailFallbackProvider();
-  const appointments = await prisma.appointment.findMany({
-    where: {
-      status: "confirmed",
-      startAt: { gte: now, lte: addHours(now, 25) }
-    },
-    include: {
-      workspace: true,
-      service: true,
-      staffMember: true,
-      client: true
+const now = new Date();
+const provider = buildMessagingProvider();
+const email = new EmailNotificationProvider();
+
+const appointments = await prisma.appointment.findMany({
+  where: {
+    status: "confirmed",
+    startAt: { gte: now, lte: addHours(now, 25) }
+  },
+  include: {
+    workspace: true,
+    service: true,
+    staffMember: true,
+    client: true
+  }
+});
+
+for (const appointment of appointments) {
+  const windows = [
+    { type: "reminder_24h", target: addHours(now, 24) },
+    { type: "reminder_2h", target: addHours(now, 2) }
+  ];
+
+  for (const window of windows) {
+    if (!isWithinInterval(appointment.startAt, { start: addMinutes(window.target, -5), end: addMinutes(window.target, 5) })) {
+      continue;
     }
-  });
 
-  let deliveriesCreated = 0;
+    const exists = await prisma.reminderLog.findUnique({
+      where: { appointmentId_type: { appointmentId: appointment.id, type: window.type } }
+    });
+    if (exists) continue;
 
-  for (const appointment of appointments) {
-    const windows = [
-      { type: "reminder_24h", target: addHours(now, 24) },
-      { type: "reminder_2h", target: addHours(now, 2) }
-    ];
-
-    for (const window of windows) {
-      if (!isWithinInterval(appointment.startAt, { start: addMinutes(window.target, -5), end: addMinutes(window.target, 5) })) {
-        continue;
+    const payload = {
+      templateName: window.type,
+      language: "pt_BR",
+      variables: {
+        businessName: appointment.workspace.name,
+        serviceName: appointment.service.name,
+        date: appointment.startAt.toLocaleDateString("pt-BR"),
+        time: appointment.startAt.toLocaleTimeString("pt-BR"),
+        staffName: appointment.staffMember.name,
+        address: appointment.workspace.address ?? "",
+        cancelLink: `${env.PUBLIC_URL}/cancel/${appointment.cancelToken}`,
+        rescheduleLink: `${env.PUBLIC_URL}/reschedule/${appointment.id}`
       }
+    };
 
-      const dedupeKey = `${appointment.id}:${window.type}`;
-      const alreadySent = await prisma.messageDelivery.findUnique({
-        where: { dedupeKey }
-      });
-      if (alreadySent) {
-        continue;
-      }
-
-      const template = await prisma.messageTemplate.findFirst({
-        where: {
-          workspaceId: appointment.workspaceId,
-          channel: appointment.client.whatsappOptInAt ? "whatsapp" : "email",
-          type: window.type,
-          active: true
-        }
-      });
-
-      const result = appointment.client.whatsappOptInAt
+    let response =
+      appointment.client.whatsappOptInAt && appointment.client.whatsapp
         ? await provider.sendTemplate({
             to: appointment.client.whatsapp,
-            templateName: template?.templateName ?? window.type,
-            language: template?.language ?? "pt_BR",
-            variables: {
-              cliente: appointment.client.name,
-              negocio: appointment.workspace.name,
-              servico: appointment.service.name,
-              data: appointment.startAt.toLocaleDateString("pt-BR"),
-              hora: appointment.startAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-              profissional: appointment.staffMember.name
-            }
+            ...payload
           })
-        : await email.sendTemplate({
-            to: appointment.client.email ?? "",
-            templateName: template?.templateName ?? window.type,
-            language: template?.language ?? "pt_BR",
-            variables: {}
-          });
+        : { status: "failed" as const, provider: "whatsapp_skipped", response: "Cliente sem opt-in de WhatsApp" };
 
-      await prisma.messageDelivery.create({
-        data: {
-          workspaceId: appointment.workspaceId,
-          appointmentId: appointment.id,
-          clientId: appointment.clientId,
-          channel: appointment.client.whatsappOptInAt ? "whatsapp" : "email",
-          type: window.type,
-          provider: result.provider,
-          dedupeKey,
-          status: result.status,
-          response: result.response,
-          sentAt: result.status === "sent" ? new Date() : null
-        }
+    if (response.status === "failed" && appointment.client.email) {
+      response = await email.sendTemplate({
+        to: appointment.client.email,
+        ...payload
       });
-      deliveriesCreated += 1;
     }
+
+    await prisma.reminderLog.create({
+      data: {
+        appointmentId: appointment.id,
+        type: window.type,
+        provider: response.provider,
+        status: response.status,
+        response: response.response
+      }
+    });
   }
-
-  return {
-    appointmentsChecked: appointments.length,
-    deliveriesCreated
-  };
-}
-
-if (isDirectExecution()) {
-  await runSendRemindersJob();
-  await prisma.$disconnect();
-}
-
-function isDirectExecution() {
-  return Boolean(process.argv[1]) && import.meta.url === pathToFileURL(process.argv[1]).href;
 }

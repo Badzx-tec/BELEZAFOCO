@@ -1,7 +1,24 @@
-import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { addMinutes } from "date-fns";
-import type { PaymentStatus } from "@prisma/client";
 import { env } from "../../config/env.js";
+
+const MERCADO_PAGO_API_URL = "https://api.mercadopago.com";
+
+type MercadoPagoPaymentResponse = {
+  id?: string | number;
+  status?: string;
+  status_detail?: string;
+  date_of_expiration?: string | null;
+  point_of_interaction?: {
+    transaction_data?: {
+      qr_code?: string | null;
+      qr_code_base64?: string | null;
+      ticket_url?: string | null;
+    } | null;
+  } | null;
+};
+
+export type NormalizedPaymentStatus = "pending" | "paid" | "failed" | "refunded";
 
 export interface PaymentProvider {
   createPixCharge(input: {
@@ -15,28 +32,123 @@ export interface PaymentProvider {
     externalId: string;
     qrCode: string;
     pixCopyPaste: string;
-    expiresAt?: Date;
-    rawPayload: Record<string, unknown>;
+    ticketUrl?: string | null;
+    expiresAt?: Date | null;
+    idempotencyKey?: string | null;
+    providerPayload?: string | null;
+  }>;
+  getPayment(externalId: string): Promise<{
+    externalId: string;
+    status: "pending" | "paid" | "failed" | "refunded";
+    statusDetail?: string | null;
+    qrCode: string;
+    pixCopyPaste: string;
+    ticketUrl?: string | null;
+    expiresAt?: Date | null;
+    providerPayload?: string | null;
   }>;
 }
 
-type MercadoPagoPaymentResponse = {
-  id: string | number;
-  status?: string;
-  external_reference?: string;
-  date_of_expiration?: string;
-  point_of_interaction?: {
-    transaction_data?: {
-      qr_code?: string;
-      qr_code_base64?: string;
-    };
+function splitName(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return { firstName: "Cliente", lastName: "BELEZAFOCO" };
+  return {
+    firstName: parts[0],
+    lastName: parts.slice(1).join(" ") || "BELEZAFOCO"
   };
-};
+}
 
-type MercadoPagoNotification = {
-  action?: string;
-  dataId: string;
-};
+function resolvePayerEmail(payerEmail?: string) {
+  const cleaned = payerEmail?.trim().toLowerCase();
+  if (cleaned) return cleaned;
+  return `cliente-${Date.now()}@belezafoco.app`;
+}
+
+function buildNotificationUrl() {
+  try {
+    const publicUrl = new URL(env.PUBLIC_URL);
+    if (publicUrl.protocol !== "https:") return undefined;
+    if (["localhost", "127.0.0.1"].includes(publicUrl.hostname)) return undefined;
+    return new URL("/payments/webhook/mercadopago", publicUrl).toString();
+  } catch {
+    return undefined;
+  }
+}
+
+function buildQrCodeDataUri(base64?: string | null) {
+  if (!base64) return "";
+  return `data:image/png;base64,${base64}`;
+}
+
+function normalizeMercadoPagoStatus(status?: string | null): NormalizedPaymentStatus {
+  switch (status) {
+    case "approved":
+      return "paid";
+    case "cancelled":
+    case "rejected":
+      return "failed";
+    case "refunded":
+    case "charged_back":
+      return "refunded";
+    default:
+      return "pending";
+  }
+}
+
+async function mercadoPagoRequest<T>(path: string, init: RequestInit) {
+  if (!env.MP_ACCESS_TOKEN) {
+    throw new Error("Mercado Pago nao configurado");
+  }
+
+  const response = await fetch(`${MERCADO_PAGO_API_URL}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${env.MP_ACCESS_TOKEN}`,
+      "Content-Type": "application/json",
+      ...(init.headers ?? {})
+    },
+    signal: AbortSignal.timeout(10_000)
+  });
+
+  const raw = await response.text();
+  const payload = raw ? JSON.parse(raw) : null;
+
+  if (!response.ok) {
+    const details =
+      payload?.message ??
+      payload?.cause?.[0]?.description ??
+      payload?.error ??
+      raw ??
+      "erro desconhecido";
+    throw new Error(`Mercado Pago ${response.status}: ${details}`);
+  }
+
+  return payload as T;
+}
+
+function mapPixPayload(payload: MercadoPagoPaymentResponse): {
+  externalId: string;
+  status: NormalizedPaymentStatus;
+  statusDetail: string | null;
+  qrCode: string;
+  pixCopyPaste: string;
+  ticketUrl: string | null;
+  expiresAt: Date | null;
+  providerPayload: string;
+} {
+  const transactionData = payload.point_of_interaction?.transaction_data;
+
+  return {
+    externalId: String(payload.id ?? ""),
+    status: normalizeMercadoPagoStatus(payload.status),
+    statusDetail: payload.status_detail ?? null,
+    qrCode: buildQrCodeDataUri(transactionData?.qr_code_base64),
+    pixCopyPaste: transactionData?.qr_code ?? "",
+    ticketUrl: transactionData?.ticket_url ?? null,
+    expiresAt: payload.date_of_expiration ? new Date(payload.date_of_expiration) : null,
+    providerPayload: JSON.stringify(payload)
+  };
+}
 
 export class MercadoPagoProvider implements PaymentProvider {
   async createPixCharge(input: {
@@ -47,171 +159,57 @@ export class MercadoPagoProvider implements PaymentProvider {
     idempotencyKey?: string;
     externalReference?: string;
   }) {
-    const id = `mp_${Date.now()}`;
+    const idempotencyKey = input.idempotencyKey ?? randomUUID();
+    const expirationDate = addMinutes(new Date(), 30);
+    const { firstName, lastName } = splitName(input.payerName);
+    const notificationUrl = buildNotificationUrl();
 
-    if (!env.MERCADO_PAGO_ENABLED || !env.MP_ACCESS_TOKEN) {
-      return {
-        externalId: id,
-        qrCode: `data:image/png;base64,MOCK_${id}`,
-        pixCopyPaste: `00020126${input.amount}${input.description}`,
-        expiresAt: addMinutes(new Date(), 30),
-        rawPayload: {
-          mode: "mock",
-          idempotencyKey: input.idempotencyKey,
-          payerName: input.payerName,
-          payerEmail: input.payerEmail,
-          externalReference: input.externalReference
-        }
-      };
-    }
-
-    const expiresAt = addMinutes(new Date(), 30);
-    const [firstName, ...rest] = input.payerName.trim().split(/\s+/);
-    const response = await fetch("https://api.mercadopago.com/v1/payments", {
+    const payload = await mercadoPagoRequest<MercadoPagoPaymentResponse>("/v1/payments", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${env.MP_ACCESS_TOKEN}`,
-        "Content-Type": "application/json",
-        "X-Idempotency-Key": input.idempotencyKey ?? randomUUID()
+        "X-Idempotency-Key": idempotencyKey
       },
       body: JSON.stringify({
         transaction_amount: Number((input.amount / 100).toFixed(2)),
         description: input.description,
         payment_method_id: "pix",
-        notification_url: `${env.API_BASE_URL}/payments/webhook/mercadopago`,
-        external_reference: input.externalReference ?? input.idempotencyKey ?? id,
-        date_of_expiration: expiresAt.toISOString(),
+        date_of_expiration: expirationDate.toISOString(),
         payer: {
-          email: resolvePayerEmail(input.payerEmail, input.payerName),
-          first_name: firstName || "Cliente",
-          last_name: rest.join(" ") || undefined
-        }
+          email: resolvePayerEmail(input.payerEmail),
+          first_name: firstName,
+          last_name: lastName
+        },
+        ...(input.externalReference ? { external_reference: input.externalReference } : {}),
+        ...(notificationUrl ? { notification_url: notificationUrl } : {})
       })
     });
 
-    if (!response.ok) {
-      throw new Error(`MERCADO_PAGO_CREATE_PIX_FAILED:${response.status}`);
-    }
-
-    const body = (await response.json()) as MercadoPagoPaymentResponse;
-    const transactionData = body.point_of_interaction?.transaction_data;
-
-    if (!transactionData?.qr_code || !transactionData.qr_code_base64) {
-      throw new Error("MERCADO_PAGO_INVALID_PIX_RESPONSE");
+    const pixPayload = mapPixPayload(payload);
+    if (!pixPayload.externalId || !pixPayload.pixCopyPaste) {
+      throw new Error("Mercado Pago nao retornou dados Pix suficientes");
     }
 
     return {
-      externalId: String(body.id),
-      qrCode: `data:image/png;base64,${transactionData.qr_code_base64}`,
-      pixCopyPaste: transactionData.qr_code,
-      expiresAt: body.date_of_expiration ? new Date(body.date_of_expiration) : expiresAt,
-      rawPayload: body as Record<string, unknown>
+      externalId: pixPayload.externalId,
+      qrCode: pixPayload.qrCode,
+      pixCopyPaste: pixPayload.pixCopyPaste,
+      ticketUrl: pixPayload.ticketUrl,
+      expiresAt: pixPayload.expiresAt ?? expirationDate,
+      idempotencyKey,
+      providerPayload: pixPayload.providerPayload
     };
   }
 
-  async getPaymentDetails(paymentId: string) {
-    if (!env.MP_ACCESS_TOKEN) {
-      throw new Error("MERCADO_PAGO_ACCESS_TOKEN_MISSING");
-    }
-
-    const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-      headers: {
-        Authorization: `Bearer ${env.MP_ACCESS_TOKEN}`
-      }
+  async getPayment(externalId: string) {
+    const payload = await mercadoPagoRequest<MercadoPagoPaymentResponse>(`/v1/payments/${externalId}`, {
+      method: "GET"
     });
 
-    if (!response.ok) {
-      throw new Error(`MERCADO_PAGO_GET_PAYMENT_FAILED:${response.status}`);
+    const pixPayload = mapPixPayload(payload);
+    if (!pixPayload.externalId) {
+      throw new Error("Mercado Pago nao retornou o identificador do pagamento");
     }
 
-    return (await response.json()) as MercadoPagoPaymentResponse;
+    return pixPayload;
   }
-}
-
-export function normalizeMercadoPagoNotification(input: {
-  body: Record<string, unknown>;
-  query: Record<string, unknown>;
-}) {
-  const bodyData = typeof input.body.data === "object" && input.body.data ? (input.body.data as Record<string, unknown>) : null;
-  const bodyId = bodyData?.id ?? input.body.id;
-  const queryId = input.query["data.id"] ?? input.query.id;
-  const dataId = String(bodyId ?? queryId ?? "");
-
-  if (!dataId) {
-    return null;
-  }
-
-  return {
-    action: typeof input.body.action === "string" ? input.body.action : undefined,
-    dataId
-  } satisfies MercadoPagoNotification;
-}
-
-export function mapMercadoPagoStatus(status?: string): PaymentStatus {
-  switch (status) {
-    case "approved":
-      return "paid";
-    case "cancelled":
-      return "cancelled";
-    case "rejected":
-      return "failed";
-    case "refunded":
-      return "refunded";
-    case "expired":
-      return "expired";
-    default:
-      return "pending";
-  }
-}
-
-export function verifyMercadoPagoWebhookSignature(input: {
-  dataId: string;
-  signatureHeader?: string;
-  requestIdHeader?: string;
-  secret?: string;
-}) {
-  if (!input.secret) return true;
-  if (!input.signatureHeader || !input.requestIdHeader || !input.dataId) return false;
-
-  const parts = Object.fromEntries(
-    input.signatureHeader
-      .split(",")
-      .map((entry) => entry.trim().split("="))
-      .filter((entry) => entry.length === 2)
-  );
-
-  const ts = parts.ts;
-  const version = parts.v1;
-
-  if (!ts || !version) return false;
-
-  const manifest = buildMercadoPagoWebhookManifest({
-    dataId: input.dataId,
-    requestIdHeader: input.requestIdHeader,
-    ts
-  });
-  const digest = createHmac("sha256", input.secret).update(manifest).digest("hex");
-
-  return timingSafeEqual(Buffer.from(digest), Buffer.from(version));
-}
-
-export function buildMercadoPagoWebhookManifest(input: {
-  dataId: string;
-  requestIdHeader: string;
-  ts: string;
-}) {
-  return `id:${input.dataId};request-id:${input.requestIdHeader};ts:${input.ts};`;
-}
-
-function resolvePayerEmail(email: string | undefined, payerName: string) {
-  if (email) return email;
-
-  const normalized = payerName
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ".")
-    .replace(/(^\.|\.$)/g, "");
-
-  return `${normalized || "cliente"}@belezafoco.local`;
 }
