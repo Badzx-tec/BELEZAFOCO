@@ -635,19 +635,21 @@ export function PublicBookingPage() {
               <h2 className="mt-4 text-2xl font-semibold text-slate-950">Confirme seus dados</h2>
               <form className="mt-5 space-y-4" onSubmit={onSubmit}>
                 <Field label="Nome completo" hint="Obrigatorio">
-                  <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Como devemos te chamar?" required />
+                  <Input id="booking-name" name="name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Como devemos te chamar?" required />
                 </Field>
 
                 <Field label="WhatsApp" hint="Obrigatorio">
-                  <Input value={whatsapp} onChange={(event) => setWhatsapp(event.target.value)} placeholder="+55" required />
+                  <Input id="booking-whatsapp" name="whatsapp" value={whatsapp} onChange={(event) => setWhatsapp(event.target.value)} placeholder="+55" required />
                 </Field>
 
                 <Field label="E-mail" hint="Opcional">
-                  <Input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Para recibo e lembretes" type="email" />
+                  <Input id="booking-email" name="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Para recibo e lembretes" type="email" />
                 </Field>
 
                 <Field label="Observacoes" hint="Opcional">
                   <Textarea
+                    id="booking-notes"
+                    name="notes"
                     value={notes}
                     onChange={(event) => setNotes(event.target.value)}
                     placeholder="Preferencia de atendimento, referencia ou observacao rapida."
@@ -655,6 +657,8 @@ export function PublicBookingPage() {
                 </Field>
 
                 <CheckboxField
+                  id="booking-policy"
+                  name="policyAccepted"
                   checked={policyAccepted}
                   onChange={(event) => setPolicyAccepted(event.target.checked)}
                   title="Li e aceito a politica do agendamento"
