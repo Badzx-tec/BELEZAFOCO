@@ -38,11 +38,11 @@ Date base: 2026-03-11
 - Workspace setup / onboarding
   - draft id: `67110d19-1731-4641-8824-e41e3f6ea62d`
   - preview: `https://p.superdesign.dev/draft/67110d19-1731-4641-8824-e41e3f6ea62d`
-  - local target:
-    - next onboarding/configuration flow after authentication
+  - local route: `/app/setup`
+  - local file: `apps/web/src/pages/OnboardingPage.tsx`
   - status:
-    - route not exposed yet
-    - draft reserved as the visual basis for the onboarding rollout
+    - route exposed
+    - wired to `/me/workspace`, `/me/onboarding-summary`, `/me/services`, `/me/staff` and `/me/business-hours`
 
 - Operational dashboard
   - draft id: `9c9f5040-174f-4863-88e8-b3d359ffc128`
@@ -71,11 +71,11 @@ Date base: 2026-03-11
 - Billing
   - draft id: `a7d7bf35-a2f2-426c-848d-d7c89e076ed2`
   - preview: `https://p.superdesign.dev/draft/a7d7bf35-a2f2-426c-848d-d7c89e076ed2`
-  - local target:
-    - SaaS billing / upgrade flow
+  - local route: `/app/billing`
+  - local file: `apps/web/src/pages/BillingPage.tsx`
   - status:
-    - route not exposed yet
-    - draft reserved as the visual basis for the billing rollout
+    - route exposed
+    - wired to `/me/billing/summary` and `/me/billing/request-upgrade`
 
 ## Implementation constraints
 
@@ -94,4 +94,5 @@ Date base: 2026-03-11
 
 - The Superdesign project has been fetched and mapped.
 - `apps/web` now builds cleanly with the supporting design/runtime dependencies restored.
-- The page-by-page migration can proceed against the draft map above without losing route ownership.
+- Auth, onboarding and billing are now ported into the local React app with live backend integration.
+- Landing, dashboard and public booking remain mapped to the latest approved drafts and still own their routes locally.

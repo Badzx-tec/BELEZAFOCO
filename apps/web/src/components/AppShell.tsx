@@ -1,6 +1,7 @@
 import { useState, type PropsWithChildren, type ReactNode } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { Badge, Button } from "./ui";
-import { BrandMark, CalendarIcon, ChartIcon, UsersIcon, WalletIcon } from "./premium";
+import { BrandMark, ChartIcon, SparkIcon, UsersIcon, WalletIcon } from "./premium";
 
 type AppShellProps = PropsWithChildren<{
   title: string;
@@ -9,31 +10,38 @@ type AppShellProps = PropsWithChildren<{
   workspaceSlug?: string;
   userName?: string;
   onLogout?: () => void;
+  activeSection?: "cockpit" | "setup" | "billing";
 }>;
 
 type SidebarItem = {
+  key: "cockpit" | "setup" | "billing" | "booking";
   label: string;
   hint: string;
-  active?: boolean;
   icon: ReactNode;
+  to?: string;
+  href?: string;
 };
-
-const sidebarItems: SidebarItem[] = [
-  { label: "Cockpit", hint: "Tempo real", active: true, icon: <ChartIcon className="h-5 w-5" /> },
-  { label: "Agenda", hint: "18 reservas", icon: <CalendarIcon className="h-5 w-5" /> },
-  { label: "Clientes", hint: "CRM ativo", icon: <UsersIcon className="h-5 w-5" /> },
-  { label: "Financeiro", hint: "Pix", icon: <WalletIcon className="h-5 w-5" /> }
-];
 
 function SidebarContent({
   workspaceName,
   workspaceSlug,
+  activeSection,
   onClose
 }: {
   workspaceName: string;
   workspaceSlug?: string;
+  activeSection: "cockpit" | "setup" | "billing";
   onClose?: () => void;
 }) {
+  const sidebarItems: SidebarItem[] = [
+    { key: "cockpit", label: "Cockpit", hint: "Operacao ativa", icon: <ChartIcon className="h-5 w-5" />, to: "/app" },
+    { key: "setup", label: "Configurar estudio", hint: "Perfil e agenda", icon: <UsersIcon className="h-5 w-5" />, to: "/app/setup" },
+    { key: "billing", label: "Assinatura", hint: "Plano e upgrade", icon: <WalletIcon className="h-5 w-5" />, to: "/app/billing" },
+    ...(workspaceSlug
+      ? [{ key: "booking" as const, label: "Link publico", hint: `/${workspaceSlug}`, icon: <SparkIcon className="h-5 w-5" />, href: `/b/${workspaceSlug}` }]
+      : [])
+  ];
+
   return (
     <>
       <div className="border-b border-white/10 px-6 py-7">
@@ -64,25 +72,43 @@ function SidebarContent({
 
       <nav className="flex-1 space-y-1.5 px-4 py-6">
         {sidebarItems.map((item) => (
-          <button
-            key={item.label}
-            type="button"
-            className={`group flex w-full items-center gap-3 rounded-[24px] px-4 py-3.5 text-left transition ${
-              item.active ? "bg-white/12 text-white" : "text-slate-300 hover:bg-white/8 hover:text-white"
-            }`}
-          >
-            <span
-              className={`flex h-11 w-11 items-center justify-center rounded-2xl border transition ${
-                item.active ? "border-white/18 bg-white/10" : "border-white/10 bg-white/5 group-hover:border-white/18"
+          (item.to ? (
+            <Link
+              key={item.key}
+              to={item.to}
+              className={`group flex w-full items-center gap-3 rounded-[24px] px-4 py-3.5 text-left transition ${
+                item.key === activeSection ? "bg-white/12 text-white" : "text-slate-300 hover:bg-white/8 hover:text-white"
               }`}
             >
-              {item.icon}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold">{item.label}</span>
-              <span className="mt-1 block text-[10px] uppercase tracking-[0.2em] text-slate-500">{item.hint}</span>
-            </span>
-          </button>
+              <span
+                className={`flex h-11 w-11 items-center justify-center rounded-2xl border transition ${
+                  item.key === activeSection ? "border-white/18 bg-white/10" : "border-white/10 bg-white/5 group-hover:border-white/18"
+                }`}
+              >
+                {item.icon}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold">{item.label}</span>
+                <span className="mt-1 block text-[10px] uppercase tracking-[0.2em] text-slate-500">{item.hint}</span>
+              </span>
+            </Link>
+          ) : (
+            <a
+              key={item.key}
+              href={item.href}
+              target="_blank"
+              rel="noreferrer"
+              className="group flex w-full items-center gap-3 rounded-[24px] px-4 py-3.5 text-left text-slate-300 transition hover:bg-white/8 hover:text-white"
+            >
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 transition group-hover:border-white/18">
+                {item.icon}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold">{item.label}</span>
+                <span className="mt-1 block text-[10px] uppercase tracking-[0.2em] text-slate-500">{item.hint}</span>
+              </span>
+            </a>
+          ))
         ))}
       </nav>
 
@@ -116,8 +142,12 @@ function SidebarContent({
   );
 }
 
-export function AppShell({ title, subtitle, workspaceName, workspaceSlug, userName, onLogout, children }: AppShellProps) {
+export function AppShell({ title, subtitle, workspaceName, workspaceSlug, userName, onLogout, activeSection, children }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
+  const resolvedSection =
+    activeSection ??
+    (location.pathname.startsWith("/app/setup") ? "setup" : location.pathname.startsWith("/app/billing") ? "billing" : "cockpit");
 
   return (
     <div className="relative min-h-screen overflow-hidden px-4 py-4 text-slate-900 sm:px-6 lg:px-8">
@@ -127,7 +157,12 @@ export function AppShell({ title, subtitle, workspaceName, workspaceSlug, userNa
         <div className="fixed inset-0 z-40 bg-slate-950/45 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)}>
           <aside className="surface-dark absolute left-4 top-4 bottom-4 w-[min(88vw,370px)] overflow-hidden" onClick={(event) => event.stopPropagation()}>
             <div className="flex h-full flex-col">
-              <SidebarContent workspaceName={workspaceName} workspaceSlug={workspaceSlug} onClose={() => setMobileOpen(false)} />
+              <SidebarContent
+                workspaceName={workspaceName}
+                workspaceSlug={workspaceSlug}
+                activeSection={resolvedSection}
+                onClose={() => setMobileOpen(false)}
+              />
             </div>
           </aside>
         </div>
@@ -135,7 +170,7 @@ export function AppShell({ title, subtitle, workspaceName, workspaceSlug, userNa
 
       <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
         <aside className="surface-dark sticky top-6 hidden h-[calc(100vh-3rem)] overflow-hidden lg:flex lg:flex-col">
-          <SidebarContent workspaceName={workspaceName} workspaceSlug={workspaceSlug} />
+          <SidebarContent workspaceName={workspaceName} workspaceSlug={workspaceSlug} activeSection={resolvedSection} />
         </aside>
 
         <main className="space-y-6">

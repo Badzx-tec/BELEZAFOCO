@@ -2,17 +2,41 @@ import { useEffect, useMemo, useState } from "react";
 import { GoogleLogin, GoogleOAuthProvider } from "@react-oauth/google";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Badge, Button, Card, Field, Input } from "../components/ui";
+import { ArrowRightIcon, BrandMark, CheckIcon, ShieldIcon, SparkIcon, WalletIcon } from "../components/premium";
+import { PasswordField } from "../components/PasswordField";
 import { getAuthConfig, useAuth } from "../lib/auth";
+import { buildPublicBookingUrl, normalizeWorkspaceSlug } from "../lib/auth-ui";
+import { readableError } from "../lib/format";
 
 type AuthConfig = Awaited<ReturnType<typeof getAuthConfig>>;
+type AuthMode = "login" | "register" | "forgot";
 
-function normalizeSlug(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+type RegisterFormState = {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  workspaceName: string;
+  slug: string;
+  whatsapp: string;
+};
+
+const registerInitialState: RegisterFormState = {
+  name: "",
+  email: "",
+  password: "",
+  confirmPassword: "",
+  workspaceName: "",
+  slug: "",
+  whatsapp: ""
+};
+
+function pageOrigin(config: AuthConfig | null) {
+  if (typeof window !== "undefined" && window.location.origin) {
+    return window.location.origin;
+  }
+
+  return config?.googleCurrentOrigin ?? null;
 }
 
 export function AuthPage() {
@@ -20,20 +44,14 @@ export function AuthPage() {
   const location = useLocation();
   const { isAuthenticated, login, register, loginWithGoogle, requestPasswordReset, resendVerification } = useAuth();
   const [config, setConfig] = useState<AuthConfig | null>(null);
-  const [mode, setMode] = useState<"login" | "register" | "forgot">("login");
+  const [mode, setMode] = useState<AuthMode>("login");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [blockedEmail, setBlockedEmail] = useState<string | null>(null);
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
-  const [registerForm, setRegisterForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-    workspaceName: "",
-    slug: "",
-    whatsapp: ""
-  });
+  const [registerForm, setRegisterForm] = useState<RegisterFormState>(registerInitialState);
+  const [registerSlugManual, setRegisterSlugManual] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [googleCredential, setGoogleCredential] = useState<string | null>(null);
   const [googleProfile, setGoogleProfile] = useState<{ email: string; name: string; avatarUrl?: string | null } | null>(null);
@@ -42,6 +60,7 @@ export function AuthPage() {
     slug: "",
     whatsapp: ""
   });
+  const [googleSlugManual, setGoogleSlugManual] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -56,9 +75,13 @@ export function AuthPage() {
     async function loadConfig() {
       try {
         const next = await getAuthConfig();
-        if (!cancelled) setConfig(next);
+        if (!cancelled) {
+          setConfig(next);
+        }
       } catch (loadError) {
-        if (!cancelled) setError(loadError instanceof Error ? loadError.message : "Nao foi possivel carregar a autenticacao");
+        if (!cancelled) {
+          setError(readableError(loadError));
+        }
       }
     }
 
@@ -68,34 +91,59 @@ export function AuthPage() {
     };
   }, []);
 
-  const heroText = useMemo(
-    () =>
-      mode === "register"
-        ? "Crie seu workspace com e-mail verificado e onboarding real."
-        : mode === "forgot"
-          ? "Recupere o acesso com fluxo seguro de redefinicao."
-          : "Entre com sua conta e continue a operacao real do seu negocio.",
-    [mode]
+  const bookingLinkPreview = useMemo(
+    () => buildPublicBookingUrl(pageOrigin(config), registerForm.slug || registerForm.workspaceName),
+    [config, registerForm.slug, registerForm.workspaceName]
   );
 
-  const googleStatus = useMemo(() => {
+  const googleBookingPreview = useMemo(
+    () => buildPublicBookingUrl(pageOrigin(config), googleWorkspace.slug || googleWorkspace.workspaceName),
+    [config, googleWorkspace.slug, googleWorkspace.workspaceName]
+  );
+
+  const googleBadge = useMemo(() => {
     if (!config?.googleConfigured) {
-      return { label: "Pendente", tone: "neutral" as const };
+      return { label: "Em configuracao", tone: "neutral" as const };
     }
 
     if (config.googleEnabled) {
-      return { label: "Ativo", tone: "success" as const };
+      return { label: "Google ativo", tone: "success" as const };
     }
 
-    return { label: "Bloqueado", tone: "warning" as const };
+    return { label: "Indisponivel neste dominio", tone: "warning" as const };
   }, [config]);
+
+  function clearFeedback() {
+    setMessage(null);
+    setError(null);
+  }
+
+  function handleModeChange(nextMode: AuthMode) {
+    setMode(nextMode);
+    clearFeedback();
+  }
+
+  function handleWorkspaceNameChange(value: string) {
+    setRegisterForm((current) => ({
+      ...current,
+      workspaceName: value,
+      slug: registerSlugManual ? current.slug : normalizeWorkspaceSlug(value)
+    }));
+  }
+
+  function handleGoogleWorkspaceNameChange(value: string) {
+    setGoogleWorkspace((current) => ({
+      ...current,
+      workspaceName: value,
+      slug: googleSlugManual ? current.slug : normalizeWorkspaceSlug(value)
+    }));
+  }
 
   async function handleLoginSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setBusy(true);
-    setError(null);
-    setMessage(null);
+    clearFeedback();
     setBlockedEmail(null);
+    setBusy(true);
 
     try {
       const result = await login(loginForm);
@@ -107,7 +155,7 @@ export function AuthPage() {
 
       navigate("/app", { replace: true });
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Nao foi possivel entrar");
+      setError(readableError(submitError));
     } finally {
       setBusy(false);
     }
@@ -115,22 +163,40 @@ export function AuthPage() {
 
   async function handleRegisterSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    clearFeedback();
     setBusy(true);
-    setError(null);
-    setMessage(null);
 
     try {
-      const result = await register(registerForm);
+      if (registerForm.password !== registerForm.confirmPassword) {
+        throw new Error("Repita a mesma senha nos dois campos.");
+      }
+
+      const safeSlug = normalizeWorkspaceSlug(registerForm.slug || registerForm.workspaceName);
+      if (safeSlug.length < 3) {
+        throw new Error("Defina um link publico com pelo menos 3 caracteres.");
+      }
+
+      const result = await register({
+        email: registerForm.email,
+        password: registerForm.password,
+        name: registerForm.name,
+        workspaceName: registerForm.workspaceName,
+        slug: safeSlug,
+        whatsapp: registerForm.whatsapp || undefined
+      });
+
+      setLoginForm({ email: result.email, password: "" });
+      setRegisterForm(registerInitialState);
+      setRegisterSlugManual(false);
+      setBlockedEmail(result.email);
       setMode("login");
       setMessage(
         result.emailSent
           ? `Conta criada. Enviamos a confirmacao para ${result.email}.`
-          : `Conta criada, mas o e-mail nao saiu agora. Use "reenviar confirmacao" para ${result.email}.`
+          : `Conta criada, mas o e-mail ainda nao saiu. Reenvie a confirmacao para ${result.email}.`
       );
-      setBlockedEmail(result.email);
-      setLoginForm((current) => ({ ...current, email: result.email }));
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Nao foi possivel criar a conta");
+      setError(readableError(submitError));
     } finally {
       setBusy(false);
     }
@@ -138,15 +204,14 @@ export function AuthPage() {
 
   async function handleForgotSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    clearFeedback();
     setBusy(true);
-    setError(null);
-    setMessage(null);
 
     try {
       await requestPasswordReset(forgotEmail);
-      setMessage("Se existir uma conta com este e-mail, enviamos o link de redefinicao.");
+      setMessage("Se existir uma conta com este e-mail, enviamos um link de redefinicao.");
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Nao foi possivel iniciar a recuperacao");
+      setError(readableError(submitError));
     } finally {
       setBusy(false);
     }
@@ -154,24 +219,23 @@ export function AuthPage() {
 
   async function handleResendVerification() {
     if (!blockedEmail) return;
+
+    clearFeedback();
     setBusy(true);
-    setError(null);
-    setMessage(null);
 
     try {
       await resendVerification(blockedEmail);
       setMessage(`Reenviamos o link de confirmacao para ${blockedEmail}.`);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Nao foi possivel reenviar o e-mail");
+      setError(readableError(submitError));
     } finally {
       setBusy(false);
     }
   }
 
-  async function handleGoogleCredential(credential: string) {
+  async function handleGoogleSuccess(credential: string) {
+    clearFeedback();
     setBusy(true);
-    setError(null);
-    setMessage(null);
 
     try {
       const result = await loginWithGoogle({ credential });
@@ -180,16 +244,17 @@ export function AuthPage() {
         setGoogleProfile(result.profile);
         setGoogleWorkspace({
           workspaceName: result.profile.name,
-          slug: normalizeSlug(result.profile.name),
+          slug: normalizeWorkspaceSlug(result.profile.name),
           whatsapp: ""
         });
+        setGoogleSlugManual(false);
         setMessage("Complete o nome do negocio para finalizar sua conta com Google.");
         return;
       }
 
       navigate("/app", { replace: true });
     } catch (googleError) {
-      setError(googleError instanceof Error ? googleError.message : "Nao foi possivel entrar com Google");
+      setError(readableError(googleError));
     } finally {
       setBusy(false);
     }
@@ -199,92 +264,124 @@ export function AuthPage() {
     event.preventDefault();
     if (!googleCredential) return;
 
+    clearFeedback();
     setBusy(true);
-    setError(null);
 
     try {
+      const safeSlug = normalizeWorkspaceSlug(googleWorkspace.slug || googleWorkspace.workspaceName);
+      if (safeSlug.length < 3) {
+        throw new Error("Defina um link publico com pelo menos 3 caracteres.");
+      }
+
       const result = await loginWithGoogle({
         credential: googleCredential,
         workspaceName: googleWorkspace.workspaceName,
-        slug: googleWorkspace.slug,
-        whatsapp: googleWorkspace.whatsapp
+        slug: safeSlug,
+        whatsapp: googleWorkspace.whatsapp || undefined
       });
 
       if (result.mode === "authenticated") {
         navigate("/app", { replace: true });
       }
     } catch (googleError) {
-      setError(googleError instanceof Error ? googleError.message : "Nao foi possivel finalizar o cadastro com Google");
+      setError(readableError(googleError));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(194,107,54,0.14),transparent_36%),linear-gradient(180deg,#fffaf6_0%,#f8f6f1_48%,#f5f5f4_100%)] px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto grid min-h-[calc(100vh-3rem)] max-w-7xl gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-        <section className="surface-dark relative overflow-hidden px-7 py-8 sm:px-8 sm:py-10">
-          <div className="absolute inset-x-0 top-0 h-48 bg-[radial-gradient(circle_at_top,rgba(194,107,54,0.3),transparent_58%)]" />
-          <div className="relative">
-            <Badge tone="accent" className="bg-amber-400/12 text-amber-100 ring-amber-300/20">
-              Producao real
-            </Badge>
-            <h1 className="mt-6 max-w-lg text-balance font-[Sora] text-4xl font-semibold leading-tight text-white sm:text-5xl">
-              Login, registro e onboarding em fluxo real.
-            </h1>
-            <p className="mt-5 max-w-xl text-base leading-8 text-slate-300">{heroText}</p>
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(194,107,54,0.12),transparent_36%),linear-gradient(180deg,#f9f3ec_0%,#f5ecdf_46%,#efe3d4_100%)] px-4 py-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-7xl flex-col gap-6 lg:flex-row">
+        <section className="surface-dark relative overflow-hidden px-6 py-8 sm:px-8 lg:w-1/2 lg:px-14 lg:py-14">
+          <div className="absolute -right-16 top-0 h-64 w-64 rounded-full bg-[rgba(194,107,54,0.22)] blur-3xl" />
+          <div className="relative flex h-full flex-col justify-between gap-10">
+            <div>
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <BrandMark inverse subtitle="Agenda premium para negocios de beleza" />
+                <Link to="/" className="text-xs font-bold uppercase tracking-[0.24em] text-white/58 transition hover:text-white">
+                  Voltar ao site
+                </Link>
+              </div>
 
-            <div className="mt-10 grid gap-4 sm:grid-cols-2">
-              {[
-                "Verificacao de e-mail obrigatoria",
-                "Google Sign-In com token verificado no backend",
-                "JWT com refresh token rotativo",
-                "Workspace e RBAC desde o primeiro acesso"
-              ].map((item) => (
-                <div key={item} className="rounded-[28px] border border-white/10 bg-white/8 px-4 py-4 text-sm leading-7 text-slate-200">
-                  {item}
-                </div>
-              ))}
+              <div className="mt-10 max-w-xl">
+                <Badge tone="accent" className="bg-amber-400/14 text-amber-100 ring-amber-300/20">
+                  cadastro editorial
+                </Badge>
+                <h1 className="mt-6 text-balance text-4xl font-semibold leading-[1.08] text-white sm:text-5xl lg:text-6xl">
+                  Comece seu link publico premium com uma jornada limpa, curta e confiavel.
+                </h1>
+                <p className="mt-5 max-w-lg text-base leading-8 text-slate-300">
+                  Crie sua conta, confirme o e-mail e publique uma experiencia que transmite valor desde o primeiro clique.
+                </p>
+              </div>
             </div>
 
-            <div className="mt-10 rounded-[32px] border border-white/10 bg-white/6 p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Fluxo ativo</p>
-              <div className="mt-4 space-y-3">
-                <div className="rounded-[24px] bg-white/8 px-4 py-4">
-                  <p className="text-sm font-semibold text-white">1. Cadastro ou Google</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-300">Conta vinculada ao workspace e aos limites do plano.</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-[28px] border border-white/10 bg-white/6 px-5 py-5">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-400/10 text-emerald-300">
+                  <SparkIcon className="h-5 w-5" />
                 </div>
-                <div className="rounded-[24px] bg-white/8 px-4 py-4">
-                  <p className="text-sm font-semibold text-white">2. Verificacao por e-mail</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-300">Sem ativar o e-mail, a sessao nao entra no painel.</p>
+                <p className="mt-4 text-sm font-semibold uppercase tracking-[0.18em] text-white/72">Setup rapido</p>
+                <p className="mt-2 text-sm leading-7 text-slate-300">Nome do negocio, link publico e acesso liberado sem atrito visual.</p>
+              </div>
+              <div className="rounded-[28px] border border-white/10 bg-white/6 px-5 py-5">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-400/10 text-amber-300">
+                  <ShieldIcon className="h-5 w-5" />
                 </div>
-                <div className="rounded-[24px] bg-white/8 px-4 py-4">
-                  <p className="text-sm font-semibold text-white">3. Painel por workspace</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-300">Resumo real carregado via `/auth/me` e `/me/dashboard/summary`.</p>
+                <p className="mt-4 text-sm font-semibold uppercase tracking-[0.18em] text-white/72">Confirmacao segura</p>
+                <p className="mt-2 text-sm leading-7 text-slate-300">Seu acesso so entra na plataforma depois da validacao do e-mail.</p>
+              </div>
+              <div className="rounded-[28px] border border-white/10 bg-white/6 px-5 py-5">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-white">
+                  <WalletIcon className="h-5 w-5" />
+                </div>
+                <p className="mt-4 text-sm font-semibold uppercase tracking-[0.18em] text-white/72">Pronto para vender</p>
+                <p className="mt-2 text-sm leading-7 text-slate-300">Link publico, Pix, agenda e onboarding no mesmo produto desde o dia 1.</p>
+              </div>
+              <div className="rounded-[28px] border border-white/10 bg-white/6 px-5 py-5">
+                <p className="text-xs font-bold uppercase tracking-[0.28em] text-white/48">Credibilidade</p>
+                <div className="mt-4 flex items-center gap-3">
+                  <div className="flex -space-x-3">
+                    <img alt="Cliente premium 1" className="h-11 w-11 rounded-full border-2 border-slate-950 object-cover" src="/professionals-placeholders/artist-amber.svg" />
+                    <img alt="Cliente premium 2" className="h-11 w-11 rounded-full border-2 border-slate-950 object-cover" src="/professionals-placeholders/artist-graphite.svg" />
+                  </div>
+                  <p className="text-sm leading-6 text-slate-300">Estudios, barbearias e nail designers ativando o fluxo com visual premium.</p>
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        <section className="surface flex items-center px-4 py-4 sm:px-6">
+        <section className="surface flex items-center px-4 py-4 sm:px-6 lg:w-1/2">
           <Card className="w-full px-6 py-6 sm:px-7 sm:py-7">
             <div className="flex flex-wrap gap-2">
-              <Button variant={mode === "login" ? "primary" : "secondary"} size="sm" onClick={() => setMode("login")}>
-                Entrar
+              <Button type="button" variant={mode === "login" ? "primary" : "secondary"} size="sm" onClick={() => handleModeChange("login")}>
+                Login
               </Button>
-              <Button variant={mode === "register" ? "primary" : "secondary"} size="sm" onClick={() => setMode("register")}>
-                Criar conta
+              <Button type="button" variant={mode === "register" ? "primary" : "secondary"} size="sm" onClick={() => handleModeChange("register")}>
+                Registrar
               </Button>
-              <Button variant={mode === "forgot" ? "primary" : "secondary"} size="sm" onClick={() => setMode("forgot")}>
+              <Button type="button" variant={mode === "forgot" ? "primary" : "secondary"} size="sm" onClick={() => handleModeChange("forgot")}>
                 Recuperar senha
               </Button>
             </div>
 
-            <div className="mt-6 space-y-4">
-              {message ? <div className="rounded-[24px] border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm leading-7 text-emerald-800">{message}</div> : null}
-              {error ? <div className="rounded-[24px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm leading-7 text-rose-700">{error}</div> : null}
+            <div className="mt-8">
+              <h2 className="text-3xl font-semibold text-slate-950">
+                {mode === "register" ? "Crie sua conta" : mode === "forgot" ? "Recupere o acesso" : "Entre no painel"}
+              </h2>
+              <p className="mt-2 text-sm leading-7 text-slate-500">
+                {mode === "register"
+                  ? "Preencha o essencial para publicar seu negocio com um link proprio."
+                  : mode === "forgot"
+                    ? "Informe seu e-mail e enviaremos um link seguro para redefinir sua senha."
+                    : "Use seu e-mail e senha para continuar a configuracao ou operar o workspace."}
+              </p>
             </div>
+
+            {message ? <div className="mt-6 rounded-[24px] border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm leading-7 text-emerald-800">{message}</div> : null}
+            {error ? <div className="mt-6 rounded-[24px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm leading-7 text-rose-700">{error}</div> : null}
 
             {mode === "login" ? (
               <form className="mt-6 space-y-4" onSubmit={handleLoginSubmit}>
@@ -293,28 +390,27 @@ export function AuthPage() {
                     id="login-email"
                     name="email"
                     type="email"
+                    autoComplete="email"
+                    placeholder="voce@seunegocio.com"
                     value={loginForm.email}
                     onChange={(event) => setLoginForm((current) => ({ ...current, email: event.target.value }))}
-                    placeholder="voce@empresa.com"
-                    autoComplete="email"
                   />
                 </Field>
-                <Field label="Senha">
-                  <Input
-                    id="login-password"
-                    name="password"
-                    type="password"
-                    value={loginForm.password}
-                    onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))}
-                    placeholder="Sua senha"
-                    autoComplete="current-password"
-                  />
-                </Field>
+                <PasswordField
+                  id="login-password"
+                  name="password"
+                  autoComplete="current-password"
+                  label="Senha"
+                  placeholder="Sua senha"
+                  value={loginForm.password}
+                  onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))}
+                />
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <Button type="submit" busy={busy}>
-                    Entrar no painel
+                  <Button type="submit" busy={busy} className="gap-2">
+                    Entrar
+                    {!busy ? <ArrowRightIcon className="h-4 w-4" /> : null}
                   </Button>
-                  <button type="button" className="text-sm font-semibold text-slate-500 hover:text-slate-900" onClick={() => setMode("forgot")}>
+                  <button type="button" className="text-sm font-semibold text-slate-500 hover:text-slate-900" onClick={() => handleModeChange("forgot")}>
                     Esqueci minha senha
                   </button>
                 </div>
@@ -328,65 +424,83 @@ export function AuthPage() {
 
             {mode === "register" ? (
               <form className="mt-6 grid gap-4 sm:grid-cols-2" onSubmit={handleRegisterSubmit}>
-                <Field label="Nome">
-                  <Input id="register-name" name="name" value={registerForm.name} onChange={(event) => setRegisterForm((current) => ({ ...current, name: event.target.value }))} />
+                <Field label="Nome completo">
+                  <Input
+                    id="register-name"
+                    name="name"
+                    autoComplete="name"
+                    placeholder="Ex: Ricardo Silva"
+                    value={registerForm.name}
+                    onChange={(event) => setRegisterForm((current) => ({ ...current, name: event.target.value }))}
+                  />
                 </Field>
-                <Field label="WhatsApp">
+                <Field label="WhatsApp" hint="Opcional">
                   <Input
                     id="register-whatsapp"
                     name="whatsapp"
+                    autoComplete="tel"
+                    placeholder="+55 11 99999-9999"
                     value={registerForm.whatsapp}
                     onChange={(event) => setRegisterForm((current) => ({ ...current, whatsapp: event.target.value }))}
-                    placeholder="+55 11 99999-9999"
                   />
                 </Field>
-                <Field label="E-mail" className="sm:col-span-2">
+                <Field label="E-mail profissional" className="sm:col-span-2">
                   <Input
                     id="register-email"
                     name="email"
                     type="email"
+                    autoComplete="email"
+                    placeholder="contato@seunegocio.com"
                     value={registerForm.email}
                     onChange={(event) => setRegisterForm((current) => ({ ...current, email: event.target.value }))}
-                    placeholder="contato@seunegocio.com"
                   />
                 </Field>
-                <Field label="Senha">
-                  <Input
-                    id="register-password"
-                    name="password"
-                    type="password"
-                    value={registerForm.password}
-                    onChange={(event) => setRegisterForm((current) => ({ ...current, password: event.target.value }))}
-                    placeholder="Minimo 8 caracteres"
-                  />
-                </Field>
-                <Field label="Nome do negocio">
+                <Field label="Nome do negocio" className="sm:col-span-2">
                   <Input
                     id="register-workspace-name"
                     name="workspaceName"
+                    autoComplete="organization"
+                    placeholder="Ex: Studio Beleza Foco"
                     value={registerForm.workspaceName}
-                    onChange={(event) =>
-                      setRegisterForm((current) => ({
-                        ...current,
-                        workspaceName: event.target.value,
-                        slug: current.slug || normalizeSlug(event.target.value)
-                      }))
-                    }
-                    placeholder="Studio Beleza Foco"
+                    onChange={(event) => handleWorkspaceNameChange(event.target.value)}
                   />
                 </Field>
-                <Field label="Link publico" hint="slug unico" className="sm:col-span-2">
+                <Field label="Link publico" hint="gerado automaticamente" className="sm:col-span-2">
                   <Input
                     id="register-slug"
                     name="slug"
-                    value={registerForm.slug}
-                    onChange={(event) => setRegisterForm((current) => ({ ...current, slug: normalizeSlug(event.target.value) }))}
+                    autoComplete="off"
                     placeholder="studio-beleza-foco"
+                    value={registerForm.slug}
+                    onChange={(event) => {
+                      setRegisterSlugManual(true);
+                      setRegisterForm((current) => ({ ...current, slug: normalizeWorkspaceSlug(event.target.value) }));
+                    }}
                   />
+                  <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">{bookingLinkPreview}</p>
                 </Field>
+                <PasswordField
+                  id="register-password"
+                  name="password"
+                  autoComplete="new-password"
+                  label="Senha"
+                  placeholder="Minimo 8 caracteres"
+                  value={registerForm.password}
+                  onChange={(event) => setRegisterForm((current) => ({ ...current, password: event.target.value }))}
+                />
+                <PasswordField
+                  id="register-confirm-password"
+                  name="confirmPassword"
+                  autoComplete="new-password"
+                  label="Repita a senha"
+                  placeholder="Digite a mesma senha"
+                  value={registerForm.confirmPassword}
+                  onChange={(event) => setRegisterForm((current) => ({ ...current, confirmPassword: event.target.value }))}
+                />
                 <div className="sm:col-span-2">
-                  <Button type="submit" busy={busy}>
-                    Criar conta e enviar confirmacao
+                  <Button type="submit" busy={busy} className="gap-2">
+                    Criar conta
+                    {!busy ? <ArrowRightIcon className="h-4 w-4" /> : null}
                   </Button>
                 </div>
               </form>
@@ -399,100 +513,118 @@ export function AuthPage() {
                     id="forgot-email"
                     name="email"
                     type="email"
+                    autoComplete="email"
+                    placeholder="voce@seunegocio.com"
                     value={forgotEmail}
                     onChange={(event) => setForgotEmail(event.target.value)}
-                    placeholder="voce@empresa.com"
                   />
                 </Field>
-                <Button type="submit" busy={busy}>
-                  Enviar link de redefinicao
-                </Button>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button type="submit" busy={busy}>
+                    Enviar link
+                  </Button>
+                  <button type="button" className="text-sm font-semibold text-slate-500 hover:text-slate-900" onClick={() => handleModeChange("login")}>
+                    Voltar ao login
+                  </button>
+                </div>
               </form>
             ) : null}
 
-            <div className="mt-8 hairline h-px" />
-
-            <div className="mt-8 space-y-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">Continuar com Google</p>
-                  <p className="mt-1 text-sm leading-6 text-slate-500">Token verificado no backend e provisionamento de workspace no primeiro acesso.</p>
+            {mode !== "forgot" ? (
+              <>
+                <div className="mt-8 flex items-center gap-3">
+                  <div className="hairline h-px flex-1" />
+                  <span className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">ou continue com</span>
+                  <div className="hairline h-px flex-1" />
                 </div>
-                <Badge tone={googleStatus.tone}>{googleStatus.label}</Badge>
-              </div>
 
-              {config?.googleEnabled && config.googleClientId ? (
-                <GoogleOAuthProvider clientId={config.googleClientId}>
-                  <div className="flex flex-col gap-4">
-                    <GoogleLogin
-                      onSuccess={(response) => {
-                        if (response.credential) {
-                          void handleGoogleCredential(response.credential);
-                        }
-                      }}
-                      onError={() => setError("Nao foi possivel iniciar o login Google")}
-                      locale="pt_BR"
-                      text="signin_with"
-                      theme="filled_black"
-                      shape="pill"
-                    />
-                    {googleProfile && googleCredential ? (
-                      <form className="grid gap-4 rounded-[28px] border border-slate-200/80 bg-slate-50/80 px-4 py-4" onSubmit={handleGoogleRegisterSubmit}>
-                        <div className="flex items-center gap-3">
-                          {googleProfile.avatarUrl ? <img src={googleProfile.avatarUrl} alt={googleProfile.name} className="h-12 w-12 rounded-full object-cover" /> : null}
-                          <div>
-                            <p className="text-sm font-semibold text-slate-900">{googleProfile.name}</p>
-                            <p className="text-sm text-slate-500">{googleProfile.email}</p>
-                          </div>
-                        </div>
-                        <Field label="Nome do negocio">
-                          <Input
-                            id="google-workspace-name"
-                            name="workspaceName"
-                            value={googleWorkspace.workspaceName}
-                            onChange={(event) =>
-                              setGoogleWorkspace((current) => ({
-                                ...current,
-                                workspaceName: event.target.value,
-                                slug: current.slug || normalizeSlug(event.target.value)
-                              }))
-                            }
-                          />
-                        </Field>
-                        <Field label="Slug publico">
-                          <Input
-                            id="google-slug"
-                            name="slug"
-                            value={googleWorkspace.slug}
-                            onChange={(event) => setGoogleWorkspace((current) => ({ ...current, slug: normalizeSlug(event.target.value) }))}
-                          />
-                        </Field>
-                        <Field label="WhatsApp">
-                          <Input id="google-whatsapp" name="whatsapp" value={googleWorkspace.whatsapp} onChange={(event) => setGoogleWorkspace((current) => ({ ...current, whatsapp: event.target.value }))} />
-                        </Field>
-                        <Button type="submit" busy={busy}>
-                          Finalizar conta com Google
-                        </Button>
-                      </form>
-                    ) : null}
+                <div className="mt-6 rounded-[28px] border border-slate-200/80 bg-slate-50/70 px-4 py-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">Google</p>
+                      <p className="mt-1 text-sm leading-6 text-slate-500">Entre ou finalize seu cadastro com a mesma conta Google do negocio.</p>
+                    </div>
+                    <Badge tone={googleBadge.tone}>{googleBadge.label}</Badge>
                   </div>
-                </GoogleOAuthProvider>
-              ) : (
-                <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm leading-7 text-slate-500">
-                  <p>{config?.googleDisabledReason ?? "Configure GOOGLE_CLIENT_ID no backend para liberar o botao real do Google Sign-In."}</p>
-                  {config?.googleCurrentOrigin ? (
-                    <p className="mt-2 text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Dominio detectado: {config.googleCurrentOrigin}</p>
-                  ) : null}
-                </div>
-              )}
-            </div>
 
-            <div className="mt-8 text-sm text-slate-500">
-              Ao continuar, voce concorda com os termos do BELEZAFOCO. Precisa voltar ao site?{" "}
-              <Link to="/" className="font-semibold text-slate-900">
-                Abrir landing
-              </Link>
-              .
+                  <div className="mt-4">
+                    {config?.googleEnabled && config.googleClientId ? (
+                      <GoogleOAuthProvider clientId={config.googleClientId}>
+                        <div className="space-y-4">
+                          <GoogleLogin
+                            locale="pt_BR"
+                            text="continue_with"
+                            theme="filled_black"
+                            shape="pill"
+                            onSuccess={(response) => {
+                              if (response.credential) {
+                                void handleGoogleSuccess(response.credential);
+                              }
+                            }}
+                            onError={() => setError("Nao foi possivel iniciar o acesso com Google.")}
+                          />
+
+                          {googleProfile && googleCredential ? (
+                            <form className="grid gap-4 rounded-[24px] border border-slate-200 bg-white px-4 py-4" onSubmit={handleGoogleRegisterSubmit}>
+                              <div className="flex items-center gap-3">
+                                {googleProfile.avatarUrl ? (
+                                  <img alt={googleProfile.name} className="h-12 w-12 rounded-full object-cover" src={googleProfile.avatarUrl} />
+                                ) : (
+                                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-950 text-sm font-semibold text-white">
+                                    {googleProfile.name.slice(0, 2).toUpperCase()}
+                                  </div>
+                                )}
+                                <div>
+                                  <p className="text-sm font-semibold text-slate-950">{googleProfile.name}</p>
+                                  <p className="mt-1 text-sm text-slate-500">{googleProfile.email}</p>
+                                </div>
+                              </div>
+                              <Field label="Nome do negocio">
+                                <Input autoComplete="organization" value={googleWorkspace.workspaceName} onChange={(event) => handleGoogleWorkspaceNameChange(event.target.value)} />
+                              </Field>
+                              <Field label="Link publico">
+                                <Input
+                                  autoComplete="off"
+                                  value={googleWorkspace.slug}
+                                  onChange={(event) => {
+                                    setGoogleSlugManual(true);
+                                    setGoogleWorkspace((current) => ({ ...current, slug: normalizeWorkspaceSlug(event.target.value) }));
+                                  }}
+                                />
+                                <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">{googleBookingPreview}</p>
+                              </Field>
+                              <Field label="WhatsApp" hint="Opcional">
+                                <Input autoComplete="tel" value={googleWorkspace.whatsapp} onChange={(event) => setGoogleWorkspace((current) => ({ ...current, whatsapp: event.target.value }))} />
+                              </Field>
+                              <Button type="submit" busy={busy}>
+                                Finalizar cadastro com Google
+                              </Button>
+                            </form>
+                          ) : null}
+                        </div>
+                      </GoogleOAuthProvider>
+                    ) : (
+                      <p className="text-sm leading-7 text-slate-500">
+                        Google ainda nao esta liberado neste dominio. O acesso por e-mail continua disponivel enquanto a liberacao termina.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : null}
+
+            <div className="mt-8 rounded-[24px] border border-slate-200/80 bg-white/70 px-4 py-4">
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-2xl bg-slate-950 text-white">
+                  <CheckIcon className="h-4 w-4" />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-slate-950">Tudo em uma pagina limpa</p>
+                  <p className="mt-1 text-sm leading-7 text-slate-500">
+                    Login, registro e recuperacao sem texto tecnico, sem distrações e com o link publico do negocio ja pronto para conferência.
+                  </p>
+                </div>
+              </div>
             </div>
           </Card>
         </section>

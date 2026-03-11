@@ -2,6 +2,12 @@
 
 ## 2026-03-11
 
+- synced the updated Superdesign auth, onboarding and billing drafts into the local app with new `/app/setup` and `/app/billing` routes
+- rebuilt `/auth` into a clean editorial auth surface with password visibility toggles, double password confirmation and automatic public-link slug preview from the business name
+- hardened email verification UX so successful confirmation performs a full redirect into the authenticated app flow
+- refreshed the reset-password page to match the premium auth direction and removed leftover browser autocomplete warnings from the register form
+- added `/me/billing/summary` and `/me/billing/request-upgrade` so the billing screen reads real subscription state and records upgrade requests in the audit trail
+- wired the new setup screen to live workspace, staff, services and business-hours endpoints instead of leaving the imported design as a static mock
 - hardened `/auth/config` so Google Sign-In is only exposed when the current published origin is authorized
 - added `GOOGLE_ALLOWED_ORIGINS` to the backend environment contract and Northflank examples
 - updated the auth page to surface the real Google status (`Ativo`, `Bloqueado`, `Pendente`) instead of a generic pending state

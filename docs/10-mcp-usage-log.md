@@ -66,6 +66,13 @@ Date base: 2026-03-11
 - impact: locked the approved remote frontend as the visual source of truth for `apps/web`
 - deliverable: `docs/17-superdesign-frontend-map.md` with exact draft-to-route mapping
 
+## Superdesign remote sync follow-up
+
+- phase: auth/onboarding/billing implementation
+- usage: fetched the live draft HTML for `49d3669c-c107-4583-9ac4-517da6622bd6`, `67110d19-1731-4641-8824-e41e3f6ea62d` and `a7d7bf35-a2f2-426c-848d-d7c89e076ed2`
+- impact: drove the final local implementation of the clean auth shell, the new `/app/setup` onboarding route and the new `/app/billing` subscription route
+- decision influenced: kept the editorial split layout from Superdesign while replacing unsupported fake checkout fields with real workspace-backed upgrade requests
+
 ## find-skills skill
 
 - phase: skill discovery
@@ -104,3 +111,15 @@ Date base: 2026-03-11
 - usage: checked project status
 - impact: returned unauthorized
 - decision influenced: Convex remains formally rejected as a transactional core and is not part of the current production path
+
+## Playwright follow-up validation
+
+- phase: auth UX validation
+- usage: exercised the rebuilt register tab locally and confirmed password visibility toggles, double-password fields and automatic slug generation from the business name
+- impact: verified the requested auth behavior before deploy
+
+## Chrome DevTools follow-up validation
+
+- phase: combined-service validation
+- usage: loaded the rebuilt `/auth` page from the local Fastify combined service and checked console plus network state
+- impact: confirmed the auth shell, bundled assets and `/auth/config` request load cleanly in the same-origin deploy model
