@@ -69,7 +69,7 @@ Publish BELEZAFOCO as a stable combined service on Northflank with predictable m
 - liveness: `GET /healthz`
 - readiness: `GET /readyz`
 - auth smoke: `GET /auth/config`
-- commercial smoke: `GET /b/demo-beleza` only when the reserved demo slug is intentionally enabled
+- commercial smoke: `GET /b/demo-beleza` on every release, unless `PUBLIC_DEMO_ENABLED=false` is set explicitly
 
 ## Google Sign-In checklist
 

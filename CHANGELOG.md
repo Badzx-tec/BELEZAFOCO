@@ -28,6 +28,7 @@
 - created Notion delta pages for production findings and rollout updates
 - generated a Figma flow artifact for the commercial production path and opened a Superdesign project for premium auth work
 - refreshed `docs/01-technical-audit.md`, `docs/02-architecture-decisions.md`, `docs/04-northflank-deploy.md` and `docs/10-mcp-usage-log.md`
+- enabled the reserved `demo-beleza` public demo fallback by default unless production explicitly disables it with `PUBLIC_DEMO_ENABLED=false`
 - removed dead backend booking/resource-capacity code and the legacy test that no longer matched the production booking core
 - restored missing frontend runtime dependencies (`react-hook-form`, `zod`, `@tanstack/react-query`, `@hookform/resolvers`, `@sentry/vite-plugin`) and brought `apps/web` back to a clean production build
 - mapped the approved Superdesign remote project to the local routes in `docs/17-superdesign-frontend-map.md`

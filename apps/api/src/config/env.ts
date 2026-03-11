@@ -31,7 +31,7 @@ const envSchema = z.object({
   LOG_LEVEL: z.string().optional(),
   API_BASE_URL: z.string().optional(),
   SUPERADMIN_EMAIL: z.string().email().optional(),
-  PUBLIC_DEMO_ENABLED: z.coerce.boolean().default(false),
+  PUBLIC_DEMO_ENABLED: z.coerce.boolean().default(true),
   WHATSAPP_PROVIDER: z.enum(["mock", "cloud_api", "none"]).default("none"),
   WHATSAPP_CLOUD_API_TOKEN: z.string().optional(),
   WHATSAPP_CLOUD_PHONE_ID: z.string().optional(),

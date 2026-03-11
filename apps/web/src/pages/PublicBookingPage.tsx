@@ -105,7 +105,7 @@ function hoursLabel(minutes: number) {
 function summarizeBusinessHours(businessHours: PublicWorkspaceData["businessHours"]) {
   return businessHours
     .map((item) => `${weekdayLabels[item.weekday]} ${item.startTime} - ${item.endTime}`)
-    .join(" · ");
+    .join(" | ");
 }
 
 export function PublicBookingPage() {
