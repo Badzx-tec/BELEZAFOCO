@@ -1,0 +1,871 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum MembershipStatus {
+  invited
+  active
+  suspended
+  revoked
+}
+
+enum UserStatus {
+  invited
+  active
+  blocked
+}
+
+enum WorkspaceStatus {
+  trial
+  active
+  past_due
+  cancelled
+}
+
+enum OAuthProvider {
+  google
+}
+
+enum SessionKind {
+  web
+  mobile
+}
+
+enum ServicePricingModel {
+  fixed
+  starts_at
+}
+
+enum StaffStatus {
+  active
+  inactive
+}
+
+enum ClientStatus {
+  active
+  inactive
+  archived
+}
+
+enum AppointmentStatus {
+  draft
+  pending_payment
+  confirmed
+  checked_in
+  completed
+  cancelled
+  rescheduled
+  no_show
+}
+
+enum ReminderChannel {
+  whatsapp
+  email
+}
+
+enum ReminderStatus {
+  scheduled
+  processing
+  sent
+  failed
+  cancelled
+}
+
+enum PaymentProvider {
+  mercado_pago
+  manual
+}
+
+enum PaymentStatus {
+  pending
+  authorized
+  paid
+  failed
+  refunded
+  expired
+}
+
+enum LedgerDirection {
+  inflow
+  outflow
+}
+
+enum LedgerEntryKind {
+  receivable
+  payable
+  payment
+  commission
+  adjustment
+  cash_movement
+}
+
+enum LedgerEntryStatus {
+  pending
+  settled
+  cancelled
+  overdue
+}
+
+enum FinancialAccountKind {
+  cash
+  bank
+  digital_wallet
+}
+
+enum NotificationStatus {
+  queued
+  sent
+  failed
+}
+
+enum FileAssetType {
+  image
+  document
+  avatar
+  logo
+}
+
+enum CommissionRuleKind {
+  percentage
+  fixed_amount
+}
+
+enum CommissionStatementStatus {
+  draft
+  closed
+  paid
+}
+
+enum SubscriptionStatus {
+  trialing
+  active
+  past_due
+  cancelled
+}
+
+enum NotificationChannel {
+  whatsapp
+  email
+  system
+}
+
+model User {
+  id                 String               @id @default(cuid())
+  email              String               @unique
+  fullName           String
+  avatarUrl          String?
+  status             UserStatus           @default(invited)
+  emailVerifiedAt    DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  memberships        Membership[]
+  sessions           Session[]
+  accounts           Account[]
+  passwordCredential PasswordCredential?
+  oauthLinks         OAuthProviderLink[]
+  staffProfiles      StaffProfile[]
+  auditLogs          AuditLog[]           @relation("AuditActor")
+  notifications      NotificationLog[]    @relation("NotificationRecipient")
+  openedCashSessions CashSession[]        @relation("CashSessionOpenedBy")
+  closedCashSessions CashSession[]        @relation("CashSessionClosedBy")
+  uploadedAssets     FileAsset[]          @relation("FileAssetUploader")
+}
+
+model Account {
+  id          String        @id @default(cuid())
+  userId      String
+  provider    OAuthProvider
+  providerRef String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  oauthLink   OAuthProviderLink?
+
+  @@unique([provider, providerRef])
+  @@index([userId])
+}
+
+model Session {
+  id             String      @id @default(cuid())
+  userId         String
+  workspaceId    String?
+  kind           SessionKind @default(web)
+  accessTokenId  String      @unique
+  refreshTokenId String      @unique
+  csrfSecret     String
+  ipAddress      String?
+  userAgent      String?
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace      Workspace?  @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  @@index([userId, expiresAt])
+  @@index([workspaceId])
+}
+
+model PasswordCredential {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  passwordHash    String
+  passwordVersion Int      @default(1)
+  lastChangedAt   DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Workspace {
+  id                     String                  @id @default(cuid())
+  name                   String
+  slug                   String                  @unique
+  timezone               String                  @default("America/Sao_Paulo")
+  status                 WorkspaceStatus         @default(trial)
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  businessProfile        BusinessProfile?
+  memberships            Membership[]
+  sessions               Session[]
+  services               Service[]
+  serviceCategories      ServiceCategory[]
+  staffProfiles          StaffProfile[]
+  clients                Client[]
+  appointments           Appointment[]
+  availabilityRules      AvailabilityRule[]
+  availabilityExceptions AvailabilityException[]
+  reminderJobs           ReminderJob[]
+  payments               Payment[]
+  paymentAttempts        PaymentAttempt[]
+  receivables            Receivable[]
+  payables               Payable[]
+  ledgerEntries          LedgerEntry[]
+  financialAccounts      FinancialAccount[]
+  cashSessions           CashSession[]
+  commissionRules        CommissionRule[]
+  commissionStatements   CommissionStatement[]
+  expenseCategories      ExpenseCategory[]
+  revenueCategories      RevenueCategory[]
+  costCenters            CostCenter[]
+  auditLogs              AuditLog[]
+  subscription           WorkspaceSubscription?
+  featureLimits          FeatureLimit[]
+  notifications          NotificationLog[]
+  files                  FileAsset[]
+}
+
+model Membership {
+  id          String           @id @default(cuid())
+  workspaceId String
+  userId      String
+  roleId      String
+  status      MembershipStatus @default(active)
+  invitedAt   DateTime?
+  joinedAt    DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        Role             @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId, status])
+}
+
+model Role {
+  id          String       @id @default(cuid())
+  code        String       @unique
+  name        String
+  description String?
+  permissions Json
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  memberships Membership[]
+}
+
+model BusinessProfile {
+  id            String    @id @default(cuid())
+  workspaceId   String    @unique
+  legalName     String
+  tradeName     String
+  niche         String
+  primaryColor  String    @default("#c26b36")
+  accentColor   String    @default("#0f172a")
+  logoAssetId   String?
+  contactEmail  String?
+  contactPhone  String?
+  addressLine1  String?
+  city          String?
+  state         String?
+  bookingPolicy String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  logoAsset     FileAsset? @relation("BusinessProfileLogo", fields: [logoAssetId], references: [id], onDelete: SetNull)
+
+  @@index([tradeName])
+}
+
+model ServiceCategory {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  slug        String
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  services    Service[]
+
+  @@unique([workspaceId, slug])
+}
+
+model Service {
+  id                  String              @id @default(cuid())
+  workspaceId         String
+  categoryId          String?
+  name                String
+  slug                String
+  description         String?
+  pricingModel        ServicePricingModel @default(fixed)
+  priceCents          Int
+  depositRequired     Boolean             @default(false)
+  depositAmountCents  Int?
+  durationMinutes     Int
+  bufferBeforeMinutes Int                 @default(0)
+  bufferAfterMinutes  Int                 @default(0)
+  isActive            Boolean             @default(true)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  workspace           Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  category            ServiceCategory?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  appointments        Appointment[]
+  commissionRules     CommissionRule[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId, isActive])
+}
+
+model StaffProfile {
+  id                     String                  @id @default(cuid())
+  workspaceId            String
+  userId                 String?
+  fullName               String
+  displayName            String
+  status                 StaffStatus            @default(active)
+  bio                    String?
+  avatarAssetId          String?
+  colorHex               String                 @default("#c26b36")
+  commissionPercent      Decimal?               @db.Decimal(5, 2)
+  canReceiveBookings     Boolean                @default(true)
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+  workspace              Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user                   User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  avatarAsset            FileAsset?             @relation("StaffAvatar", fields: [avatarAssetId], references: [id], onDelete: SetNull)
+  appointments           Appointment[]
+  availabilityRules      AvailabilityRule[]
+  availabilityExceptions AvailabilityException[]
+  receivables            Receivable[]
+  commissionRules        CommissionRule[]
+  commissionStatements   CommissionStatement[]
+
+  @@index([workspaceId, status])
+}
+
+model Client {
+  id                         String            @id @default(cuid())
+  workspaceId                String
+  avatarAssetId              String?
+  fullName                   String
+  email                      String?
+  phone                      String?
+  birthDate                  DateTime?
+  status                     ClientStatus      @default(active)
+  notes                      String?
+  communicationConsent       Boolean           @default(false)
+  whatsappConsent            Boolean           @default(false)
+  emailConsent               Boolean           @default(false)
+  marketingConsentAt         DateTime?
+  firstVisitAt               DateTime?
+  lastVisitAt                DateTime?
+  lastNoShowAt               DateTime?
+  visitCount                 Int               @default(0)
+  noShowCount                Int               @default(0)
+  totalRevenueCents          Int               @default(0)
+  createdAt                  DateTime          @default(now())
+  updatedAt                  DateTime          @updatedAt
+  workspace                  Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  avatarAsset                FileAsset?        @relation("ClientAvatar", fields: [avatarAssetId], references: [id], onDelete: SetNull)
+  appointments               Appointment[]
+  receivables                Receivable[]
+  notifications              NotificationLog[] @relation("NotificationClient")
+
+  @@index([workspaceId, status, lastVisitAt])
+  @@unique([workspaceId, email])
+  @@unique([workspaceId, phone])
+}
+
+model Appointment {
+  id                       String              @id @default(cuid())
+  workspaceId              String
+  serviceId                String
+  staffProfileId           String
+  clientId                 String
+  status                   AppointmentStatus   @default(draft)
+  publicBookingToken       String?             @unique
+  notes                    String?
+  startsAt                 DateTime
+  endsAt                   DateTime
+  paymentExpiresAt         DateTime?
+  depositRequiredAmountCents Int?
+  depositPaidAt            DateTime?
+  checkedInAt              DateTime?
+  completedAt              DateTime?
+  cancelledAt              DateTime?
+  cancelledReason          String?
+  noShowRecordedAt         DateTime?
+  rescheduledFromId        String?
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
+  workspace                Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  service                  Service             @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  staffProfile             StaffProfile        @relation(fields: [staffProfileId], references: [id], onDelete: Restrict)
+  client                   Client              @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  payments                 Payment[]
+  receivables              Receivable[]
+  reminderJobs             ReminderJob[]
+  notifications            NotificationLog[]   @relation("NotificationAppointment")
+  rescheduledFrom          Appointment?        @relation("AppointmentReschedule", fields: [rescheduledFromId], references: [id], onDelete: SetNull)
+  rescheduledTo            Appointment[]       @relation("AppointmentReschedule")
+
+  @@index([workspaceId, startsAt, status])
+  @@index([workspaceId, staffProfileId, startsAt])
+  @@index([workspaceId, clientId, startsAt])
+}
+
+model AvailabilityRule {
+  id           String       @id @default(cuid())
+  workspaceId  String
+  staffProfileId String
+  dayOfWeek    Int
+  startTime    String
+  endTime      String
+  slotIntervalMinutes Int   @default(15)
+  capacity     Int          @default(1)
+  appliesFrom  DateTime?
+  appliesTo    DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  staffProfile StaffProfile @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, staffProfileId, dayOfWeek])
+}
+
+model AvailabilityException {
+  id            String       @id @default(cuid())
+  workspaceId    String
+  staffProfileId String?
+  startsAt       DateTime
+  endsAt         DateTime
+  isAvailable    Boolean     @default(false)
+  reason         String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  workspace      Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  staffProfile   StaffProfile? @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, startsAt, endsAt])
+  @@index([workspaceId, staffProfileId, startsAt])
+}
+
+model ReminderJob {
+  id               String         @id @default(cuid())
+  workspaceId       String
+  appointmentId     String
+  channel           ReminderChannel
+  status            ReminderStatus @default(scheduled)
+  templateCode      String?
+  scheduledFor      DateTime
+  processedAt       DateTime?
+  attemptCount      Int           @default(0)
+  lastError         String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  workspace         Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  appointment       Appointment   @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, status, scheduledFor])
+  @@index([appointmentId, channel])
+}
+
+model Payment {
+  id               String          @id @default(cuid())
+  workspaceId       String
+  appointmentId     String?
+  receivableId      String?
+  provider          PaymentProvider
+  status            PaymentStatus   @default(pending)
+  amountCents       Int
+  currency          String          @default("BRL")
+  idempotencyKey    String          @unique
+  externalPaymentId String?
+  pixQrCode         String?
+  pixCopyPaste      String?
+  providerMetadata  Json?
+  expiresAt         DateTime?
+  paidAt            DateTime?
+  refundedAt        DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  workspace         Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  appointment       Appointment?    @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  receivable        Receivable?     @relation(fields: [receivableId], references: [id], onDelete: SetNull)
+  attempts          PaymentAttempt[]
+  ledgerEntries     LedgerEntry[]
+
+  @@index([workspaceId, status, createdAt])
+  @@index([workspaceId, externalPaymentId])
+}
+
+model PaymentAttempt {
+  id                 String          @id @default(cuid())
+  workspaceId         String
+  paymentId           String
+  provider            PaymentProvider
+  status              PaymentStatus
+  idempotencyKey      String
+  externalRequestId   String?
+  requestPayload      Json
+  responsePayload     Json?
+  failureReason       String?
+  processedAt         DateTime?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  workspace           Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  payment             Payment        @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, paymentId, createdAt])
+  @@unique([paymentId, idempotencyKey])
+}
+
+model FinancialAccount {
+  id                   String                @id @default(cuid())
+  workspaceId          String
+  name                 String
+  kind                 FinancialAccountKind
+  institutionName      String?
+  branchCode           String?
+  accountMask          String?
+  currency             String                @default("BRL")
+  openingBalanceCents  Int                   @default(0)
+  currentBalanceCents  Int                   @default(0)
+  isDefault            Boolean               @default(false)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  workspace            Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ledgerEntries        LedgerEntry[]
+  cashSessions         CashSession[]
+
+  @@index([workspaceId, kind, isDefault])
+}
+
+model Receivable {
+  id                String             @id @default(cuid())
+  workspaceId       String
+  clientId          String?
+  appointmentId     String?
+  staffProfileId    String?
+  revenueCategoryId String?
+  costCenterId      String?
+  description       String
+  amountCents       Int
+  dueAt             DateTime
+  settledAt         DateTime?
+  status            LedgerEntryStatus  @default(pending)
+  origin            String             @default("booking")
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client            Client?            @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  appointment       Appointment?       @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  staffProfile      StaffProfile?      @relation(fields: [staffProfileId], references: [id], onDelete: SetNull)
+  revenueCategory   RevenueCategory?   @relation(fields: [revenueCategoryId], references: [id], onDelete: SetNull)
+  costCenter        CostCenter?        @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
+  payments          Payment[]
+  ledgerEntries     LedgerEntry[]
+
+  @@index([workspaceId, status, dueAt])
+  @@index([workspaceId, clientId, dueAt])
+}
+
+model Payable {
+  id                String             @id @default(cuid())
+  workspaceId       String
+  expenseCategoryId String?
+  costCenterId      String?
+  vendorName        String?
+  description       String
+  amountCents       Int
+  dueAt             DateTime
+  settledAt         DateTime?
+  status            LedgerEntryStatus  @default(pending)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  expenseCategory   ExpenseCategory?   @relation(fields: [expenseCategoryId], references: [id], onDelete: SetNull)
+  costCenter        CostCenter?        @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
+  ledgerEntries     LedgerEntry[]
+
+  @@index([workspaceId, status, dueAt])
+}
+
+model LedgerEntry {
+  id                 String             @id @default(cuid())
+  workspaceId        String
+  financialAccountId String?
+  receivableId       String?
+  payableId          String?
+  paymentId          String?
+  cashSessionId      String?
+  kind               LedgerEntryKind
+  direction          LedgerDirection
+  status             LedgerEntryStatus  @default(pending)
+  description        String
+  reference          String?
+  amountCents        Int
+  occurredAt         DateTime
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  workspace          Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  financialAccount   FinancialAccount?  @relation(fields: [financialAccountId], references: [id], onDelete: SetNull)
+  receivable         Receivable?        @relation(fields: [receivableId], references: [id], onDelete: SetNull)
+  payable            Payable?           @relation(fields: [payableId], references: [id], onDelete: SetNull)
+  payment            Payment?           @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  cashSession        CashSession?       @relation(fields: [cashSessionId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, occurredAt, kind])
+  @@index([workspaceId, status, occurredAt])
+}
+
+model CashSession {
+  id                   String            @id @default(cuid())
+  workspaceId          String
+  financialAccountId   String
+  openedByUserId       String?
+  closedByUserId       String?
+  openingBalanceCents  Int
+  closingBalanceCents  Int?
+  expectedBalanceCents Int?
+  varianceCents        Int?
+  openedAt             DateTime          @default(now())
+  closedAt             DateTime?
+  notes                String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  workspace            Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  financialAccount     FinancialAccount  @relation(fields: [financialAccountId], references: [id], onDelete: Restrict)
+  openedByUser         User?             @relation("CashSessionOpenedBy", fields: [openedByUserId], references: [id], onDelete: SetNull)
+  closedByUser         User?             @relation("CashSessionClosedBy", fields: [closedByUserId], references: [id], onDelete: SetNull)
+  ledgerEntries        LedgerEntry[]
+
+  @@index([workspaceId, openedAt])
+  @@index([workspaceId, closedAt])
+}
+
+model CommissionRule {
+  id                 String              @id @default(cuid())
+  workspaceId        String
+  staffProfileId     String
+  serviceId          String?
+  kind               CommissionRuleKind  @default(percentage)
+  percentage         Decimal?            @db.Decimal(5, 2)
+  flatAmountCents    Int?
+  isDefault          Boolean             @default(false)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  workspace          Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  staffProfile       StaffProfile        @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
+  service            Service?            @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, staffProfileId, isDefault])
+  @@index([workspaceId, serviceId])
+}
+
+model CommissionStatement {
+  id                    String                    @id @default(cuid())
+  workspaceId           String
+  staffProfileId        String
+  periodStart           DateTime
+  periodEnd             DateTime
+  grossRevenueCents     Int
+  commissionAmountCents Int
+  status                CommissionStatementStatus @default(draft)
+  closedAt              DateTime?
+  paidAt                DateTime?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  workspace             Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  staffProfile          StaffProfile              @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, periodStart, periodEnd])
+  @@index([workspaceId, staffProfileId, status])
+}
+
+model ExpenseCategory {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  slug        String
+  colorHex    String?   @default("#0f172a")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  payables    Payable[]
+
+  @@unique([workspaceId, slug])
+}
+
+model RevenueCategory {
+  id          String       @id @default(cuid())
+  workspaceId String
+  name        String
+  slug        String
+  colorHex    String?      @default("#c26b36")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  receivables Receivable[]
+
+  @@unique([workspaceId, slug])
+}
+
+model CostCenter {
+  id          String       @id @default(cuid())
+  workspaceId String
+  name        String
+  slug        String
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  receivables Receivable[]
+  payables    Payable[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId, isActive])
+}
+
+model AuditLog {
+  id         String    @id @default(cuid())
+  workspaceId String
+  actorUserId String?
+  action     String
+  entityType String
+  entityId   String
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime  @default(now())
+  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actor      User?     @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, entityType, entityId])
+  @@index([workspaceId, createdAt])
+}
+
+model WorkspaceSubscription {
+  id            String             @id @default(cuid())
+  workspaceId   String             @unique
+  planCode      String
+  status        SubscriptionStatus @default(trialing)
+  seatsIncluded Int                @default(1)
+  renewsAt      DateTime?
+  cancelledAt   DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  workspace     Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model FeatureLimit {
+  id          String    @id @default(cuid())
+  workspaceId String
+  code        String
+  softLimit   Int?
+  hardLimit   Int?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, code])
+}
+
+model NotificationLog {
+  id                String             @id @default(cuid())
+  workspaceId       String
+  userId            String?
+  clientId          String?
+  appointmentId     String?
+  channel           NotificationChannel
+  status            NotificationStatus @default(queued)
+  templateCode      String?
+  provider          String?
+  externalMessageId String?
+  payload           Json?
+  sentAt            DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user              User?              @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: SetNull)
+  client            Client?            @relation("NotificationClient", fields: [clientId], references: [id], onDelete: SetNull)
+  appointment       Appointment?       @relation("NotificationAppointment", fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, status, createdAt])
+  @@index([workspaceId, channel, createdAt])
+}
+
+model FileAsset {
+  id               String           @id @default(cuid())
+  workspaceId      String
+  createdByUserId  String?
+  type             FileAssetType
+  pathKey          String           @unique
+  fileName         String
+  mimeType         String
+  sizeBytes        Int
+  url              String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  workspace        Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByUser    User?            @relation("FileAssetUploader", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  businessProfiles BusinessProfile[] @relation("BusinessProfileLogo")
+  staffAvatars     StaffProfile[]   @relation("StaffAvatar")
+  clientAvatars    Client[]         @relation("ClientAvatar")
+
+  @@index([workspaceId, type, createdAt])
+}
+
+model OAuthProviderLink {
+  id           String        @id @default(cuid())
+  userId       String
+  accountId    String?
+  provider     OAuthProvider
+  providerSub  String
+  emailAtLink  String?
+  avatarUrl    String?
+  linkedAt     DateTime      @default(now())
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account      Account?      @relation(fields: [accountId], references: [id], onDelete: SetNull)
+
+  @@unique([provider, providerSub])
+  @@unique([accountId])
+  @@index([userId])
+}

@@ -1,0 +1,14 @@
+node_modules
+.git
+.next
+dist
+coverage
+playwright-report
+test-results
+env.txt
+.env
+.env.local
+.env.production
+apps/web/.next
+apps/api/dist
+apps/worker/dist

@@ -1,0 +1,49 @@
+project: belezafoco-2
+environment: production
+services:
+  - name: web
+    dockerfile: infra/docker/web.Dockerfile
+    port: 3000
+    public: true
+    healthCheck: /
+    env:
+      - APP_URL
+      - PUBLIC_URL
+      - API_INTERNAL_URL
+      - CORS_ORIGIN
+      - SENTRY_DSN
+  - name: api
+    dockerfile: infra/docker/api.Dockerfile
+    port: 4000
+    public: false
+    healthCheck: /api/v1/health/live
+    env:
+      - DATABASE_URL
+      - DIRECT_URL
+      - REDIS_URL
+      - JWT_ACCESS_SECRET
+      - JWT_REFRESH_SECRET
+      - GOOGLE_CLIENT_ID
+      - GOOGLE_CLIENT_SECRET
+      - MP_ACCESS_TOKEN
+      - MP_WEBHOOK_SECRET
+      - WHATSAPP_ACCESS_TOKEN
+      - WHATSAPP_PHONE_NUMBER_ID
+      - WHATSAPP_VERIFY_TOKEN
+      - SENTRY_DSN
+  - name: worker
+    dockerfile: infra/docker/worker.Dockerfile
+    public: false
+    env:
+      - DATABASE_URL
+      - DIRECT_URL
+      - REDIS_URL
+      - SENTRY_DSN
+jobs:
+  - name: migrate
+    command: corepack pnpm prisma:migrate:deploy
+  - name: seed-demo
+    command: corepack pnpm db:seed
+addons:
+  - postgres
+  - redis

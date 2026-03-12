@@ -1,0 +1,30 @@
+{
+  "name": "belezafoco-2",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.32.1",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "corepack pnpm --parallel --filter @belezafoco/web --filter @belezafoco/api --filter @belezafoco/worker dev",
+    "dev:web": "corepack pnpm --filter @belezafoco/web dev",
+    "dev:api": "corepack pnpm --filter @belezafoco/api start:dev",
+    "dev:worker": "corepack pnpm --filter @belezafoco/worker dev",
+    "build": "corepack pnpm -r --if-present build",
+    "lint": "corepack pnpm -r --if-present lint",
+    "test": "corepack pnpm -r --if-present test",
+    "test:e2e": "corepack pnpm exec playwright test",
+    "typecheck": "corepack pnpm prisma:generate && corepack pnpm -r --if-present typecheck",
+    "prisma:generate": "corepack pnpm --dir packages/database prisma generate --config prisma.config.ts",
+    "prisma:validate": "corepack pnpm --dir packages/database prisma validate --config prisma.config.ts",
+    "prisma:format": "corepack pnpm --dir packages/database prisma format --config prisma.config.ts",
+    "prisma:migrate:deploy": "corepack pnpm --dir packages/database prisma migrate deploy --config prisma.config.ts",
+    "db:seed": "corepack pnpm --dir packages/database prisma db seed --config prisma.config.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "turbo": "^2.5.8",
+    "typescript": "^5.9.3"
+  }
+}

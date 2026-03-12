@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: #f4ede4;
+  --color-background-soft: #fbf7f2;
+  --color-surface: rgba(255, 255, 255, 0.76);
+  --color-surface-strong: rgba(15, 23, 42, 0.92);
+  --color-surface-muted: rgba(255, 255, 255, 0.58);
+  --color-border-soft: rgba(148, 163, 184, 0.22);
+  --color-border-strong: rgba(148, 163, 184, 0.36);
+  --color-foreground: #0f172a;
+  --color-muted: #5b6476;
+  --color-accent: #c26b36;
+  --color-accent-soft: rgba(194, 107, 54, 0.14);
+  --color-success-soft: rgba(16, 185, 129, 0.14);
+  --color-danger-soft: rgba(244, 63, 94, 0.14);
+  --font-heading: "Sora", sans-serif;
+  --font-body: "Manrope", sans-serif;
+}
+
+:root {
+  --shadow-xl: 0 40px 120px -52px rgba(15, 23, 42, 0.46);
+  --shadow-lg: 0 24px 60px -34px rgba(15, 23, 42, 0.32);
+}
+
+body {
+  min-height: 100vh;
+  font-family: var(--font-body);
+  background:
+    radial-gradient(circle at top left, rgba(194, 107, 54, 0.18), transparent 28%),
+    radial-gradient(circle at top right, rgba(15, 23, 42, 0.1), transparent 30%),
+    radial-gradient(circle at 50% 100%, rgba(255, 255, 255, 0.4), transparent 30%),
+    linear-gradient(180deg, #fbf6ef 0%, #f4ecdf 48%, #efe2d3 100%);
+  color: var(--color-foreground);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading);
+  letter-spacing: -0.04em;
+}
+
+.bf-surface {
+  border: 1px solid var(--color-border-soft);
+  border-radius: 2rem;
+  background: var(--color-surface);
+  backdrop-filter: blur(24px);
+  box-shadow: var(--shadow-xl);
+}
+
+.bf-surface-dark {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 2.125rem;
+  background:
+    radial-gradient(circle at top right, rgba(194, 107, 54, 0.2), transparent 30%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.94) 0%, rgba(2, 6, 23, 0.96) 100%);
+  box-shadow: 0 34px 90px -42px rgba(15, 23, 42, 0.86);
+}
+
+.bf-mesh-panel {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.bf-soft-ring {
+  box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.14), 0 10px 30px -18px rgba(15, 23, 42, 0.18);
+}
