@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
-const apiOrigin = process.env.API_INTERNAL_URL ?? "http://localhost:4000";
+const apiOrigin =
+  process.env.API_INTERNAL_URL ??
+  (process.env.NODE_ENV === "production"
+    ? "http://belezafoco-api:3333"
+    : "http://localhost:4000");
 
 const nextConfig: NextConfig = {
   output: "standalone",
