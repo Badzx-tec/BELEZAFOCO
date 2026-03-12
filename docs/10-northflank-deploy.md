@@ -42,3 +42,10 @@
 5. Validar `GET /api/v1/health/ready`.
 6. Publicar release no Sentry.
 7. Rodar smoke tests principais.
+
+## Estado em 2026-03-12
+- o greenfield foi publicado no GitHub em `Badzx-tec/BELEZAFOCO` no commit `0c638c4`
+- as branches `main` e `deploy/northflank-premium-launch` foram alinhadas para maximizar o auto-deploy por Git
+- a autenticacao web do Northflank nao estava disponivel nesta sessao e nao havia token local para acionar deploy manual
+- o host legado `https://p03--belezafoco-api--fdzfclqyqq99.code.run/health` continuou respondendo, enquanto `GET /api/v1/health/live` permaneceu `404` durante a janela de observacao
+- conclusao: publicacao concluida, mas a substituicao manual no painel Northflank segue pendente de autenticacao

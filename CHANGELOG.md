@@ -1,6 +1,9 @@
 # Changelog
 
 ## 2026-03-12
+- publicado o greenfield no GitHub em `Badzx-tec/BELEZAFOCO` no commit `0c638c4`
+- alinhadas as branches remotas `main` e `deploy/northflank-premium-launch` com o snapshot greenfield
+- tentado o deploy no Northflank, mas o painel permaneceu inacessivel por falta de sessao/token local; o host legado ainda respondeu no endpoint `/health`
 - implementada auth real no `apps/api` com `AuthService`, `PrismaService`, cookies same-origin e refresh token rotativo
 - conectados os endpoints `register`, `login`, `refresh`, `logout`, `request-password-reset`, `reset-password`, `resend-verification`, `verify-email`, `me/session` e `me/workspaces/select`
 - adicionada guarda de sessao para rotas autenticadas do `me`
