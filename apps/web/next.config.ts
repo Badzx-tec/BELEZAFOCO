@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const apiOrigin =
   process.env.API_INTERNAL_URL ??
   (process.env.NODE_ENV === "production"
-    ? "http://belezafoco-api:3333"
+    ? "https://p03--belezafoco-api--fdzfclqyqq99.code.run"
     : "http://localhost:4000");
 
 const nextConfig: NextConfig = {
