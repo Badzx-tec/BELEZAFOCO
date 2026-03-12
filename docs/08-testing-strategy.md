@@ -15,11 +15,12 @@
 
 ## Estado atual
 - `corepack pnpm prisma:validate` passando.
-- `corepack pnpm --filter @belezafoco/api test` passando com 3 testes unitarios de auth.
+- `corepack pnpm --filter @belezafoco/api test` passando com 4 testes unitarios de auth, incluindo CSRF.
 - `corepack pnpm --filter @belezafoco/api test:e2e` passando com smoke real do endpoint de liveness.
 - `corepack pnpm typecheck` passando.
 - `corepack pnpm build` passando.
 - Playwright smoke passando para landing, booking publico e cockpit.
+- o smoke do cockpit voltou a ficar limpo apos o shell autenticado deixar de tentar bootstrap de sessao sem cookie visivel.
 - O corte atual nao adicionou E2E browser para auth porque o `playwright.config.ts` ainda sobe apenas o `web`; para fluxos completos de login/cadastro sera preciso subir `web + api` no mesmo harness.
 
 ## Risco conhecido

@@ -10,6 +10,8 @@
 - Access token curto.
 - Refresh token rotativo.
 - CSRF por double-submit cookie em mutacoes autenticadas.
+- `refresh`, `logout`, troca de workspace e mutacoes internas agora validam `x-csrf-token` contra sessao persistida.
+- RBAC inicial habilitado com `RolesGuard` para superficies financeiras e cadastros operacionais sensiveis.
 
 ## Dados
 - `workspaceId` em todos os agregados transacionais.

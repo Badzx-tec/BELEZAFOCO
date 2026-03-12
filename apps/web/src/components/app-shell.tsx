@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { PropsWithChildren } from "react";
 import { Card, DarkCard, cn } from "@belezafoco/ui";
+import { AppSessionControls } from "./app-session-controls";
 
 const navItems = [
   { href: "/app", label: "Dashboard" },
@@ -21,7 +22,7 @@ export function AppShell({ children }: PropsWithChildren) {
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-950 text-sm font-bold text-white">BF</div>
             <div>
               <p className="text-[10px] font-extrabold uppercase tracking-[0.3em] text-slate-400">BELEZAFOCO</p>
-              <p className="text-sm font-bold text-slate-950">Studio Jardins</p>
+              <p className="text-sm font-bold text-slate-950">Workspace ativo</p>
             </div>
           </div>
           <nav className="space-y-2">
@@ -44,13 +45,16 @@ export function AppShell({ children }: PropsWithChildren) {
               <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[color:var(--color-accent)]">Operacao ao vivo</p>
               <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">Cockpit Studio Jardins</h1>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <Link href="/b/studio-jardins" className="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white/80 px-5 text-sm font-bold text-slate-900">
-                Booking publico
-              </Link>
-              <Link href="/app/agenda" className="inline-flex h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-bold text-white">
-                Novo agendamento
-              </Link>
+            <div className="flex flex-col gap-3 md:items-end">
+              <AppSessionControls />
+              <div className="flex flex-wrap gap-3">
+                <Link href="/b/studio-jardins" className="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white/80 px-5 text-sm font-bold text-slate-900">
+                  Booking publico
+                </Link>
+                <Link href="/app/agenda" className="inline-flex h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-bold text-white">
+                  Novo agendamento
+                </Link>
+              </div>
             </div>
           </header>
           <div className="space-y-6">{children}</div>

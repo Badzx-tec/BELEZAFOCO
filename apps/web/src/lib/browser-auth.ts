@@ -1,18 +1,51 @@
 "use client";
 
+const CSRF_COOKIE_NAME = "bf_csrf_token";
+const CSRF_HEADER_NAME = "x-csrf-token";
+
+export async function getJson<TResponse>(path: string): Promise<TResponse> {
+  const response = await fetch(path, {
+    method: "GET",
+    credentials: "include"
+  });
+
+  return parseJsonResponse<TResponse>(response);
+}
+
 export async function postJson<TResponse>(
   path: string,
   body: Record<string, unknown>
 ): Promise<TResponse> {
+  return sendJson<TResponse>("POST", path, body);
+}
+
+export async function patchJson<TResponse>(
+  path: string,
+  body: Record<string, unknown>
+): Promise<TResponse> {
+  return sendJson<TResponse>("PATCH", path, body);
+}
+
+async function sendJson<TResponse>(
+  method: "PATCH" | "POST",
+  path: string,
+  body: Record<string, unknown>
+): Promise<TResponse> {
+  const csrfToken = readCookie(CSRF_COOKIE_NAME);
   const response = await fetch(path, {
-    method: "POST",
+    method,
     credentials: "include",
     headers: {
-      "content-type": "application/json"
+      "content-type": "application/json",
+      ...(csrfToken ? { [CSRF_HEADER_NAME]: csrfToken } : {})
     },
     body: JSON.stringify(body)
   });
 
+  return parseJsonResponse<TResponse>(response);
+}
+
+async function parseJsonResponse<TResponse>(response: Response): Promise<TResponse> {
   const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (!response.ok) {
     throw new Error(

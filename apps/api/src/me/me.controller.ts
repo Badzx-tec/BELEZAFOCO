@@ -9,6 +9,7 @@ import {
 } from "@nestjs/common";
 import type { Request, Response } from "express";
 import { AuthService } from "../auth/auth.service";
+import { CsrfGuard } from "../auth/csrf.guard";
 import { SessionAuthGuard } from "../auth/session-auth.guard";
 import type { AuthenticatedRequest } from "../auth/auth.types";
 import {
@@ -40,7 +41,7 @@ export class MeController {
     );
   }
 
-  @UseGuards(SessionAuthGuard)
+  @UseGuards(SessionAuthGuard, CsrfGuard)
   @Post("workspaces/select")
   async selectWorkspace(
     @Body() body: SelectWorkspaceDto,

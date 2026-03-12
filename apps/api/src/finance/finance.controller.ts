@@ -1,5 +1,16 @@
-import { Controller, Get, Post } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Post,
+  UseGuards
+} from "@nestjs/common";
+import { CsrfGuard } from "../auth/csrf.guard";
+import { Roles } from "../auth/roles.decorator";
+import { RolesGuard } from "../auth/roles.guard";
+import { SessionAuthGuard } from "../auth/session-auth.guard";
 
+@UseGuards(SessionAuthGuard, RolesGuard)
+@Roles("owner", "manager", "admin")
 @Controller("me/finance")
 export class FinanceController {
   @Get("dashboard")
@@ -41,6 +52,7 @@ export class FinanceController {
   }
 
   @Post("cash-sessions")
+  @UseGuards(CsrfGuard)
   createCashSession() {
     return {
       status: "accepted",

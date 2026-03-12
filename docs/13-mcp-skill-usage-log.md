@@ -19,6 +19,8 @@
 | `playwright` skill + binario local | qualidade auth slice | revalidar que a nova camada de sessao nao regrediu o frontend | smoke suite executada novamente com sucesso | confirmou que a fatia de auth nao quebrou landing, booking e cockpit |
 | `github` MCP + git local | publicacao | publicar o greenfield em remoto existente | commit `0c638c4` publicado em `main` e `deploy/northflank-premium-launch` de `Badzx-tec/BELEZAFOCO` | garantiu um remoto funcional e deixou o Git pronto para acionar deploy por integracao |
 | `playwright` skill + browser real | deploy | tentar operar GitHub/Northflank pelo navegador | GitHub e Northflank abriram em tela de login, sem sessao ativa | bloqueio confirmado para criacao de repo novo e deploy manual via dashboard |
+| `github` MCP + git local | publicacao | substituir o remoto principal pelo snapshot greenfield | `main` e `deploy/northflank-premium-launch` atualizados para `ed3edfb` | deixou o remoto pronto para integracoes de deploy por Git |
+| `playwright` skill + Playwright Test | auth frontend | revalidar shell autenticado e dashboard apos CSRF/RBAC | smoke voltou limpo apos evitar bootstrap de sessao sem cookie | confirmou que a camada visual nao regrediu com os guards novos |
 
 ## Rejeicoes formais
 - Convex fora do core transacional.

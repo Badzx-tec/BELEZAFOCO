@@ -28,9 +28,12 @@
 - `POST /api/v1/auth/logout` revoga a sessao ativa e limpa os cookies `bf_access_token`, `bf_refresh_token` e `bf_csrf_token`.
 - `GET /api/v1/me/session` agora resolve sessao real a partir do access token e retorna workspaces ativos do usuario.
 - `POST /api/v1/me/workspaces/select` troca o workspace ativo e rotaciona access token + CSRF.
+- mutacoes autenticadas agora exigem `x-csrf-token` coerente com o cookie `bf_csrf_token` e com o `csrfSecret` persistido na sessao.
+- controladores internos passaram a exigir `SessionAuthGuard`, com `RolesGuard` aplicado aos cortes financeiros e de cadastro operacional sensivel.
+- o shell autenticado do `web` agora resolve sessao em runtime, redireciona visitantes sem sessao para `/login`, permite troca de workspace e expõe logout seguro.
 - `POST /api/v1/auth/request-password-reset`, `POST /api/v1/auth/reset-password`, `POST /api/v1/auth/resend-verification` e `POST /api/v1/auth/verify-email` usam action tokens assinados; em `development`, a API devolve preview do token e da URL para acelerar QA.
 - `MailService` com `nodemailer` entrou como adapter isolado: envia SMTP real quando `SMTP_HOST`/`SMTP_USER` estao configurados e cai para preview logado quando o ambiente ainda esta sem provedor.
 - `AuditLog` ja registra `auth.register`, `auth.login`, `auth.password_reset_requested`, `auth.password_reset_completed`, `auth.email_verified` e `auth.workspace_selected` quando ha `workspaceId` disponivel.
 - O frontend publico de `/login`, `/cadastro`, `/redefinir-senha` e `/verificar-email` agora consome a API real e exibe feedback de sucesso/erro sem perder a composicao premium.
 - O seed demo agora gera hash real para `SEED_ADMIN_PASSWORD` e marca o admin demo como `emailVerifiedAt` preenchido.
-- WhatsApp Cloud API, Mercado Pago Pix e o endurecimento de RBAC/guards para modulos internos seguem para as proximas fatias.
+- WhatsApp Cloud API e Mercado Pago Pix seguem para as proximas fatias.

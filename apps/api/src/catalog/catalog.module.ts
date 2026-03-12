@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { AuthModule } from "../auth/auth.module";
 import {
   AppointmentsController,
   AvailabilityController,
@@ -8,6 +9,7 @@ import {
 } from "./catalog.controller";
 
 @Module({
+  imports: [AuthModule],
   controllers: [ServicesController, StaffController, ClientsController, AppointmentsController, AvailabilityController]
 })
 export class CatalogModule {}

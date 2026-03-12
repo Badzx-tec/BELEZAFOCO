@@ -2,7 +2,10 @@ import { JwtService } from "@nestjs/jwt";
 import { UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { hash } from "bcryptjs";
-import { AUTH_REFRESH_COOKIE } from "./auth.constants";
+import {
+  AUTH_CSRF_COOKIE,
+  AUTH_REFRESH_COOKIE
+} from "./auth.constants";
 import { AuthService } from "./auth.service";
 
 describe("AuthService", () => {
@@ -22,7 +25,8 @@ describe("AuthService", () => {
         create: jest.fn()
       },
       membership: {
-        create: jest.fn()
+        create: jest.fn(),
+        findFirst: jest.fn()
       },
       role: {
         upsert: jest.fn()
@@ -227,6 +231,12 @@ describe("AuthService", () => {
       revokedAt: null
     });
 
+    prisma.membership.findFirst.mockResolvedValue({
+      role: {
+        code: "owner"
+      }
+    });
+
     prisma.session.update.mockResolvedValue({
       id: "session_1",
       userId: "user_1",
@@ -279,8 +289,10 @@ describe("AuthService", () => {
     const result = await service.refresh(
       {
         cookies: {
+          [AUTH_CSRF_COOKIE]: "csrf_1",
           [AUTH_REFRESH_COOKIE]: refreshToken
         },
+        get: (name: string) => (name === "x-csrf-token" ? "csrf_1" : undefined),
         headers: {}
       } as never,
       {
@@ -293,5 +305,37 @@ describe("AuthService", () => {
     expect(result.response.authenticated).toBe(true);
     expect(result.cookies.refreshToken).toEqual(expect.any(String));
     expect(result.cookies.csrfToken).toBe("csrf_2");
+  });
+
+  it("rejects requests with an invalid csrf token", async () => {
+    const prisma = buildPrismaMock();
+    const mailService = buildMailServiceMock();
+    const jwt = new JwtService();
+    const service = new AuthService(prisma as never, jwt, config, mailService as never);
+
+    prisma.session.findUnique.mockResolvedValue({
+      id: "session_1",
+      csrfSecret: "csrf_expected",
+      expiresAt: new Date(Date.now() + 86_400_000),
+      revokedAt: null
+    });
+
+    await expect(
+      service.assertRequestCsrf(
+        {
+          sessionId: "session_1",
+          userId: "user_1",
+          workspaceId: "workspace_1",
+          roleCode: "owner"
+        },
+        {
+          cookies: {
+            [AUTH_CSRF_COOKIE]: "csrf_cookie"
+          },
+          get: (name: string) => (name === "x-csrf-token" ? "csrf_header" : undefined),
+          headers: {}
+        } as never
+      )
+    ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 });

@@ -22,6 +22,7 @@ import {
   AUTH_ACCESS_COOKIE,
   AUTH_ACTION_EMAIL_VERIFICATION,
   AUTH_ACTION_PASSWORD_RESET,
+  AUTH_CSRF_COOKIE,
   AUTH_GOOGLE_CSRF_COOKIE,
   AUTH_REFRESH_COOKIE
 } from "./auth.constants";
@@ -372,6 +373,15 @@ export class AuthService {
     });
 
     this.assertSessionIsActive(session, payload, "refresh");
+    await this.assertRequestCsrf(
+      {
+        sessionId: session.id,
+        userId: session.userId,
+        workspaceId: session.workspaceId,
+        roleCode: null
+      },
+      request
+    );
 
     const updatedSession = await this.prisma.session.update({
       where: { id: session.id },
@@ -393,8 +403,31 @@ export class AuthService {
   async logout(request: Request) {
     const refreshToken = readCookieFromRequest(request, AUTH_REFRESH_COOKIE);
     if (refreshToken) {
+      let payload: SessionTokenPayload | null = null;
+
       try {
-        const payload = await this.verifySessionToken(refreshToken, "refresh", true);
+        payload = await this.verifySessionToken(refreshToken, "refresh", true);
+      } catch {
+        payload = null;
+      }
+
+      if (payload) {
+        const session = await this.prisma.session.findUnique({
+          where: { id: payload.sid }
+        });
+
+        if (session) {
+          await this.assertRequestCsrf(
+            {
+              sessionId: session.id,
+              userId: session.userId,
+              workspaceId: session.workspaceId,
+              roleCode: null
+            },
+            request
+          );
+        }
+
         await this.prisma.session.updateMany({
           where: {
             id: payload.sid,
@@ -404,8 +437,6 @@ export class AuthService {
             revokedAt: new Date()
           }
         });
-      } catch {
-        // Ignore invalid tokens and still clear client cookies.
       }
     }
 
@@ -580,11 +611,60 @@ export class AuthService {
 
     this.assertSessionIsActive(session, payload, "access");
 
+    const activeMembership = session.workspaceId
+      ? await this.prisma.membership.findFirst({
+          where: {
+            status: MembershipStatus.active,
+            userId: session.userId,
+            workspaceId: session.workspaceId
+          },
+          select: {
+            role: {
+              select: {
+                code: true
+              }
+            }
+          }
+        })
+      : null;
+
+    if (session.workspaceId && !activeMembership) {
+      throw new UnauthorizedException("Workspace membership is no longer active");
+    }
+
     return {
       sessionId: session.id,
       userId: session.userId,
-      workspaceId: session.workspaceId
+      workspaceId: session.workspaceId,
+      roleCode: activeMembership?.role.code ?? null
     };
+  }
+
+  async assertRequestCsrf(auth: AuthContext, request: Request) {
+    const csrfHeader = request.get("x-csrf-token")?.trim();
+    const csrfCookie = readCookieFromRequest(request, AUTH_CSRF_COOKIE);
+
+    if (!csrfHeader || !csrfCookie || csrfHeader !== csrfCookie) {
+      throw new UnauthorizedException("CSRF token missing or invalid");
+    }
+
+    const session = await this.prisma.session.findUnique({
+      where: { id: auth.sessionId },
+      select: {
+        id: true,
+        csrfSecret: true,
+        expiresAt: true,
+        revokedAt: true
+      }
+    });
+
+    if (!session || session.revokedAt || session.expiresAt <= new Date()) {
+      throw new UnauthorizedException("Session is no longer active");
+    }
+
+    if (session.csrfSecret !== csrfHeader) {
+      throw new UnauthorizedException("CSRF token missing or invalid");
+    }
   }
 
   async tryGetSessionState(request: Request) {

@@ -28,6 +28,7 @@ export interface AuthContext {
   sessionId: string;
   userId: string;
   workspaceId: string | null;
+  roleCode: string | null;
 }
 
 export interface AuthenticatedRequest extends Request {
