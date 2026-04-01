@@ -1,15 +1,6 @@
 import { Module } from "@nestjs/common";
-import { AuthModule } from "../auth/auth.module";
-import {
-  AppointmentsController,
-  AvailabilityController,
-  ClientsController,
-  ServicesController,
-  StaffController
-} from "./catalog.controller";
 
-@Module({
-  imports: [AuthModule],
-  controllers: [ServicesController, StaffController, ClientsController, AppointmentsController, AvailabilityController]
-})
+// Catalog controllers have been migrated to dedicated modules.
+// This module is kept as a placeholder for future category management.
+@Module({})
 export class CatalogModule {}

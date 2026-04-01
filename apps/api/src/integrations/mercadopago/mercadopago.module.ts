@@ -1,4 +1,9 @@
-import { Module } from "@nestjs/common";
+import { Global, Module } from "@nestjs/common";
+import { MercadoPagoService } from "./mercadopago.service";
 
-@Module({})
+@Global()
+@Module({
+  providers: [MercadoPagoService],
+  exports: [MercadoPagoService]
+})
 export class MercadoPagoIntegrationModule {}
