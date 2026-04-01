@@ -945,7 +945,7 @@ export class AuthService {
   }
 
   private getAccessSecret() {
-    return this.configService.get("JWT_ACCESS_SECRET", "change_me_access_secret");
+    return this.configService.getOrThrow<string>("JWT_ACCESS_SECRET");
   }
 
   private getAccessTtl() {
@@ -987,7 +987,7 @@ export class AuthService {
   }
 
   private getRefreshSecret() {
-    return this.configService.get("JWT_REFRESH_SECRET", "change_me_refresh_secret");
+    return this.configService.getOrThrow<string>("JWT_REFRESH_SECRET");
   }
 
   private getRefreshTtlDays() {

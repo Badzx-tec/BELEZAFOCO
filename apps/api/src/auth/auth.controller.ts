@@ -6,6 +6,7 @@ import {
   Req,
   Res
 } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import type { Request, Response } from "express";
 import { AuthService } from "./auth.service";
 import {
@@ -27,6 +28,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post("register")
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   async register(
     @Body() body: RegisterDto,
     @Req() request: Request,
@@ -44,6 +46,7 @@ export class AuthController {
 
   @Post("login")
   @HttpCode(200)
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   async login(
     @Body() body: LoginDto,
     @Req() request: Request,
@@ -92,6 +95,7 @@ export class AuthController {
 
   @Post("request-password-reset")
   @HttpCode(200)
+  @Throttle({ default: { ttl: 60_000, limit: 3 } })
   async requestPasswordReset(@Body() body: EmailOnlyDto) {
     return this.authService.requestPasswordReset(body);
   }
@@ -110,6 +114,7 @@ export class AuthController {
 
   @Post("resend-verification")
   @HttpCode(200)
+  @Throttle({ default: { ttl: 60_000, limit: 3 } })
   async resendVerification(@Body() body: EmailOnlyDto) {
     return this.authService.resendVerification(body);
   }

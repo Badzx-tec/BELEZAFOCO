@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -r \"TODO\\\\|FIXME\\\\|XXX\\\\|HACK\" /c/Users/Admin/Documents/BELEZAFOCO/apps/api/src --include=*.ts)",
+      "Bash(git -C /c/Users/Admin/Documents/BELEZAFOCO log --oneline -20)",
+      "Bash(wc -l /c/Users/Admin/Documents/BELEZAFOCO/apps/api/src/**/*.ts)",
+      "Bash(git -C /c/Users/Admin/Documents/BELEZAFOCO branch -a)",
+      "Bash(git -C /c/Users/Admin/Documents/BELEZAFOCO remote -v)",
+      "Bash(pnpm --filter @belezafoco/api add @nestjs/throttler)",
+      "Bash(npx --yes corepack enable)",
+      "Bash(corepack pnpm:*)",
+      "Bash(npx prisma:*)",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}
